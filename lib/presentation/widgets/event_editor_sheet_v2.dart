@@ -421,53 +421,24 @@ class _PrioritySelectorState extends State<_PrioritySelector> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    for (var i = 0; i < 3; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 5),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(20),
-                          onTap: () {
-                            widget.onSelected(i);
-                            setState(() => _expanded = false);
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: _PriorityDot(priority: i, selected: widget.priority == i),
-                          ),
-                        ),
+                    for (final p in [0, 1, 2])
+                      InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () {
+                          widget.onSelected(p);
+                          setState(() => _expanded = false);
+                        },
+                        child: Padding(padding: const EdgeInsets.all(5), child: _PriorityDot(priority: p, size: p == widget.priority ? 17 : 14)),
                       ),
-                    IconButton(onPressed: () => setState(() => _expanded = false), icon: const Icon(Icons.close_rounded)),
                   ],
                 ),
               ),
             )
           : InkWell(
-              borderRadius: BorderRadius.circular(20),
+              customBorder: const CircleBorder(),
               onTap: () => setState(() => _expanded = true),
-              child: Padding(
-                padding: const EdgeInsets.all(4),
-                child: _PriorityDot(priority: widget.priority, selected: true),
-              ),
+              child: Padding(padding: const EdgeInsets.all(7), child: _PriorityDot(priority: widget.priority)),
             ),
-    );
-  }
-}
-
-class _PriorityDot extends StatelessWidget {
-  const _PriorityDot({required this.priority, required this.selected});
-  final int priority;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: nextAPriorityColor(priority),
-        border: selected ? Border.all(color: Theme.of(context).colorScheme.onSurface, width: 1.5) : null,
-      ),
     );
   }
 }
@@ -484,26 +455,31 @@ class _DateTimeColumns extends StatelessWidget {
   final VoidCallback onEndTime;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(child: Column(children: [_DateTimeButton(label: date(start), onTap: onStartDate), _DateTimeButton(label: time(start), onTap: onStartTime, large: false)])),
-        const Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Icon(Icons.arrow_forward_rounded, size: 30)),
-        Expanded(child: Column(children: [_DateTimeButton(label: date(end), onTap: onEndDate), _DateTimeButton(label: time(end), onTap: onEndTime, large: false)])),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Row(
+        children: [
+          Expanded(child: _DateTimeColumn(value: start, date: date, time: time, onDate: onStartDate, onTime: onStartTime)),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Icon(Icons.arrow_forward_rounded, size: 28)),
+          Expanded(child: _DateTimeColumn(value: end, date: date, time: time, onDate: onEndDate, onTime: onEndTime)),
+        ],
+      );
 }
 
-class _DateTimeButton extends StatelessWidget {
-  const _DateTimeButton({required this.label, required this.onTap, this.large = true});
-  final String label;
-  final VoidCallback onTap;
-  final bool large;
+class _DateTimeColumn extends StatelessWidget {
+  const _DateTimeColumn({required this.value, required this.date, required this.time, required this.onDate, required this.onTime});
+  final DateTime value;
+  final String Function(DateTime) date;
+  final String Function(DateTime) time;
+  final VoidCallback onDate;
+  final VoidCallback onTime;
 
   @override
-  Widget build(BuildContext context) => InkWell(borderRadius: BorderRadius.circular(10), onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: Text(label, style: TextStyle(fontSize: large ? 18 : 17))));
+  Widget build(BuildContext context) => Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          InkWell(borderRadius: BorderRadius.circular(10), onTap: onDate, child: Padding(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: Text(date(value), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)))),
+          InkWell(borderRadius: BorderRadius.circular(10), onTap: onTime, child: Padding(padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6), child: Text(time(value), style: const TextStyle(fontSize: 18)))),
+        ],
+      );
 }
 
 class _EditorTextField extends StatelessWidget {
@@ -651,4 +627,319 @@ class _EditorTab extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BulkImportSlot extends StatelessWidget {
+  const _BulkImportSlot();
+  @override
+  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('AI Import sẽ hỗ trợ nhập nhiều sự kiện từ nội dung lịch.', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))));
+}
+
+class _PriorityDot extends StatelessWidget {
+  const _PriorityDot({required this.priority, this.size = 16});
+  final int priority;
+  final double size;
+  @override
+  Widget build(BuildContext context) => Container(width: size, height: size, decoration: BoxDecoration(color: nextAPriorityColor(priority), shape: BoxShape.circle));
+}
+
+class _RecurrenceDialog extends StatefulWidget {
+  const _RecurrenceDialog({required this.initial, required this.start});
+  final RecurrenceRule initial;
+  final DateTime start;
+
+  @override
+  State<_RecurrenceDialog> createState() => _RecurrenceDialogState();
+}
+
+class _RecurrenceDialogState extends State<_RecurrenceDialog> {
+  late RecurrenceFrequency _frequency;
+  late TextEditingController _count;
+  late DateTime _until;
+  bool _useCount = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _frequency = widget.initial.frequency;
+    _count = TextEditingController(text: '10');
+    _until = _occurrenceDate(10);
+    if (widget.initial.endMode == RecurrenceEndMode.count && widget.initial.count != null) {
+      _count.text = widget.initial.count!.clamp(1, 366).toString();
+      _until = _occurrenceDate(widget.initial.count!.clamp(1, 366));
+      _useCount = true;
+    } else if (widget.initial.until != null) {
+      _until = widget.initial.until!;
+      _useCount = false;
+      final inferred = _occurrencesThrough(_until);
+      _count.text = inferred.clamp(1, 366).toString();
+    }
+  }
+
+  DateTime _occurrenceDate(int count) {
+    final n = count.clamp(1, 366).toInt() - 1;
+    return switch (_frequency) {
+      RecurrenceFrequency.daily => widget.start.add(Duration(days: n)),
+      RecurrenceFrequency.weekly => widget.start.add(Duration(days: 7 * n)),
+      RecurrenceFrequency.weekdays => _weekdayOccurrence(n),
+      RecurrenceFrequency.monthly => DateTime(widget.start.year, widget.start.month + n, widget.start.day, widget.start.hour, widget.start.minute),
+      RecurrenceFrequency.none => widget.start,
+    };
+  }
+
+  DateTime _weekdayOccurrence(int index) {
+    var date = widget.start;
+    var remaining = index;
+    while (remaining > 0) {
+      date = date.add(const Duration(days: 1));
+      if (date.weekday <= DateTime.friday) remaining--;
+    }
+    return date;
+  }
+
+  int _occurrencesThrough(DateTime until) {
+    if (until.isBefore(widget.start)) return 1;
+    switch (_frequency) {
+      case RecurrenceFrequency.daily:
+        return until.difference(widget.start).inDays + 1;
+      case RecurrenceFrequency.weekly:
+        return (until.difference(widget.start).inDays ~/ 7) + 1;
+      case RecurrenceFrequency.monthly:
+        return ((until.year - widget.start.year) * 12 + until.month - widget.start.month + 1).clamp(1, 366);
+      case RecurrenceFrequency.weekdays:
+        var date = widget.start;
+        var count = 1;
+        while (date.isBefore(until) && count < 366) {
+          date = date.add(const Duration(days: 1));
+          if (date.weekday <= DateTime.friday) count++;
+        }
+        return count;
+      case RecurrenceFrequency.none:
+        return 1;
+    }
+  }
+
+  @override
+  void dispose() {
+    _count.dispose();
+    super.dispose();
+  }
+
+  String _name(RecurrenceFrequency f) => switch (f) {
+    RecurrenceFrequency.none => 'Không lặp lại',
+    RecurrenceFrequency.daily => 'Hàng ngày',
+    RecurrenceFrequency.weekly => 'Hàng tuần',
+    RecurrenceFrequency.weekdays => 'Ngày trong tuần',
+    RecurrenceFrequency.monthly => 'Hàng tháng',
+  };
+
+  void _selectFrequency(RecurrenceFrequency frequency) {
+    setState(() {
+      _frequency = frequency;
+      if (frequency != RecurrenceFrequency.none) _until = _occurrenceDate(int.tryParse(_count.text) ?? 10);
+    });
+  }
+
+  Future<void> _pickUntil() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _until.isBefore(widget.start) ? widget.start : _until,
+      firstDate: widget.start,
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => _until = DateTime(picked.year, picked.month, picked.day, 23, 59, 59));
+  }
+
+  void _save() {
+    if (_frequency == RecurrenceFrequency.none) {
+      Navigator.pop(context, const RecurrenceRule(frequency: RecurrenceFrequency.none));
+      return;
+    }
+    final count = (int.tryParse(_count.text.trim()) ?? 10).clamp(1, 366).toInt();
+    Navigator.pop(
+      context,
+      RecurrenceRule(
+        frequency: _frequency,
+        endMode: _useCount ? RecurrenceEndMode.count : RecurrenceEndMode.until,
+        count: _useCount ? count : null,
+        until: _useCount ? null : _until,
+      ),
+    );
+  }
+
+  Widget _endBranch(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final count = (int.tryParse(_count.text.trim()) ?? 10).clamp(1, 366).toInt();
+    final projected = _occurrenceDate(count);
+    if (_useCount) _until = projected;
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 24, right: 0, bottom: 4),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Radio<bool>(value: true, groupValue: _useCount, onChanged: (_) => setState(() => _useCount = true)),
+              const Expanded(child: Text('Kết thúc sau')),
+              SizedBox(
+                width: 52,
+                child: TextField(
+                  controller: _count,
+                  enabled: _useCount,
+                  keyboardType: TextInputType.number,
+                  textAlign: TextAlign.center,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(isDense: true, counterText: '', contentPadding: EdgeInsets.symmetric(vertical: 6, horizontal: 4)),
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Text('lần'),
+            ],
+          ),
+          Row(
+            children: [
+              Radio<bool>(value: false, groupValue: _useCount, onChanged: (_) => setState(() => _useCount = false)),
+              const Expanded(child: Text('Đến ngày')),
+              TextButton(onPressed: _useCount ? null : _pickUntil, child: Text('${_until.day.toString().padLeft(2, '0')}/${_until.month.toString().padLeft(2, '0')}/${_until.year}', style: TextStyle(color: _useCount ? s.onSurfaceVariant : null))),
+            ],
+          ),
+          if (_useCount)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text('Ngày kết thúc: ${projected.day.toString().padLeft(2, '0')}/${projected.month.toString().padLeft(2, '0')}/${projected.year}', style: TextStyle(fontSize: 12, color: s.onSurfaceVariant)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('Lặp lại'),
+      contentPadding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final frequency in const [RecurrenceFrequency.none, RecurrenceFrequency.daily, RecurrenceFrequency.weekly, RecurrenceFrequency.monthly])
+            Column(
+              children: [
+                RadioListTile<RecurrenceFrequency>(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
+                  value: frequency,
+                  groupValue: _frequency,
+                  onChanged: (value) {
+                    if (value != null) _selectFrequency(value);
+                  },
+                  title: Text(_name(frequency)),
+                ),
+                if (_frequency == frequency && frequency != RecurrenceFrequency.none) _endBranch(context),
+              ],
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+        FilledButton(onPressed: _save, child: const Text('Lưu')),
+      ],
+    );
+  }
+}
+
+class _ReminderSettings {
+  const _ReminderSettings({required this.enabled, required this.minutes, required this.repeatCount, required this.interval});
+  final bool enabled;
+  final int minutes;
+  final int repeatCount;
+  final int interval;
+}
+
+class _ReminderDialog extends StatefulWidget {
+  const _ReminderDialog({required this.minutes, required this.repeatCount, required this.interval});
+  final int minutes;
+  final int repeatCount;
+  final int interval;
+
+  @override
+  State<_ReminderDialog> createState() => _ReminderDialogState();
+}
+
+class _ReminderDialogState extends State<_ReminderDialog> {
+  late final TextEditingController _minutes;
+  late final TextEditingController _repeatCount;
+  late final TextEditingController _interval;
+  late bool _enabled;
+
+  @override
+  void initState() {
+    super.initState();
+    _enabled = widget.minutes > 0;
+    _minutes = TextEditingController(text: (widget.minutes > 0 ? widget.minutes : 10).toString());
+    _repeatCount = TextEditingController(text: (widget.repeatCount > 0 ? widget.repeatCount : 2).toString());
+    _interval = TextEditingController(text: (widget.interval > 0 ? widget.interval : 5).toString());
+  }
+
+  @override
+  void dispose() {
+    _minutes.dispose();
+    _repeatCount.dispose();
+    _interval.dispose();
+    super.dispose();
+  }
+
+  int _value(TextEditingController c, int fallback, int min, int max) => (int.tryParse(c.text.trim()) ?? fallback).clamp(min, max).toInt();
+
+  void _save() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.pop(context, _ReminderSettings(enabled: _enabled, minutes: _value(_minutes, 10, 1, 10080), repeatCount: _value(_repeatCount, 2, 0, 20), interval: _value(_interval, 5, 1, 1440)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('Nhắc nhở'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Báo trước'), value: _enabled, onChanged: (v) => setState(() => _enabled = v)),
+          const SizedBox(height: 4),
+          _ReminderNumberRow(label: 'Báo trước', controller: _minutes, suffix: 'phút', enabled: _enabled),
+          _ReminderNumberRow(label: 'Báo lại', controller: _repeatCount, suffix: 'lần', enabled: _enabled),
+          _ReminderNumberRow(label: 'Mỗi lần cách nhau', controller: _interval, suffix: 'phút', enabled: _enabled),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+        FilledButton(onPressed: _save, child: const Text('Lưu')),
+      ],
+    );
+  }
+}
+
+class _ReminderNumberRow extends StatelessWidget {
+  const _ReminderNumberRow({required this.label, required this.controller, required this.suffix, required this.enabled});
+  final String label;
+  final TextEditingController controller;
+  final String suffix;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Expanded(child: Text(label)),
+            SizedBox(width: 58, child: TextField(controller: controller, enabled: enabled, keyboardType: TextInputType.number, textAlign: TextAlign.center, decoration: const InputDecoration(isDense: true, counterText: ''))),
+            const SizedBox(width: 8),
+            SizedBox(width: 48, child: Text(suffix)),
+          ],
+        ),
+      );
 }
