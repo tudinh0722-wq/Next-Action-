@@ -311,7 +311,20 @@ class _EventContent extends StatelessWidget {
   final VoidCallback onCancel;
   final VoidCallback onSave;
 
-  String _date(DateTime d) => 'T.${d.weekday}, ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+  String _weekdayLabel(DateTime d) {
+    switch (d.weekday) {
+      case DateTime.monday: return 'T.2';
+      case DateTime.tuesday: return 'T.3';
+      case DateTime.wednesday: return 'T.4';
+      case DateTime.thursday: return 'T.5';
+      case DateTime.friday: return 'T.6';
+      case DateTime.saturday: return 'T.7';
+      case DateTime.sunday: return 'CN';
+    }
+    return '';
+  }
+
+  String _date(DateTime d) => '${_weekdayLabel(d)}, ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
 
   String _time(DateTime d) {
     final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
@@ -488,6 +501,7 @@ class _EditorTextField extends StatelessWidget {
         textInputAction: textInputAction,
         decoration: InputDecoration(
           prefixIcon: Icon(icon),
+          prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 48),
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
