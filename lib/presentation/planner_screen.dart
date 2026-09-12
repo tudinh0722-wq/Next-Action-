@@ -176,7 +176,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
       selectedDay: _selected,
       importService: event == null ? _bulkImportService : null,
     );
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      await _reloadEvents();
+      return;
+    }
 
     if (result.deleted && event != null) {
       final scope = await _pickDeleteScope(event);
@@ -339,27 +343,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Giao diện',
-                  style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w700)),
+              const Text('Giao diện', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
                 segments: const [
-                  ButtonSegment(
-                      value: ThemeMode.system,
-                      label: Text('Hệ thống')),
-                  ButtonSegment(
-                      value: ThemeMode.light, label: Text('Sáng')),
-                  ButtonSegment(
-                      value: ThemeMode.dark, label: Text('Tối')),
+                  ButtonSegment(value: ThemeMode.system, label: Text('Hệ thống')),
+                  ButtonSegment(value: ThemeMode.light, label: Text('Sáng')),
+                  ButtonSegment(value: ThemeMode.dark, label: Text('Tối')),
                 ],
                 selected: {widget.themeMode},
-                onSelectionChanged: (s) =>
-                    widget.onThemeChanged?.call(s.first),
+                onSelectionChanged: (s) => widget.onThemeChanged?.call(s.first),
               ),
               const SizedBox(height: 18),
-              const Text('Màu chủ đề',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const Text('Màu chủ đề', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 10,
@@ -369,15 +365,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
                   Color(0xFF006A6A),
                   Color(0xFF8E4A2F),
                   Color(0xFF7A4E00),
-                ]
-                    .map((c) => _SeedColorButton(
-                        color: c,
-                        onSelected: widget.onSeedColorChanged))
-                    .toList(),
+                ].map((c) => _SeedColorButton(color: c, onSelected: widget.onSeedColorChanged)).toList(),
               ),
               const SizedBox(height: 10),
-              const Text(
-                  'Trên Android có màu động, NextA ưu tiên màu hệ thống theo Material 3.'),
+              const Text('Trên Android có màu động, NextA ưu tiên màu hệ thống theo Material 3.'),
             ],
           ),
         ),
@@ -387,22 +378,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
 }
 
 class _ScopeDialog extends StatefulWidget {
-  const _ScopeDialog({
-    required this.title,
-    required this.confirmLabel,
-    required this.isDestructive,
-  });
+  const _ScopeDialog({required this.title, required this.confirmLabel, required this.isDestructive});
   final String title;
   final String confirmLabel;
   final bool isDestructive;
-
   @override
   State<_ScopeDialog> createState() => _ScopeDialogState();
 }
 
 class _ScopeDialogState extends State<_ScopeDialog> {
   RecurrenceScope _scope = RecurrenceScope.single;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -411,45 +396,16 @@ class _ScopeDialogState extends State<_ScopeDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RadioListTile<RecurrenceScope>(
-            dense: true,
-            value: RecurrenceScope.single,
-            groupValue: _scope,
-            onChanged: (v) => setState(() => _scope = v!),
-            title: const Text('Chỉ sự kiện này'),
-          ),
-          RadioListTile<RecurrenceScope>(
-            dense: true,
-            value: RecurrenceScope.future,
-            groupValue: _scope,
-            onChanged: (v) => setState(() => _scope = v!),
-            title: const Text('Sự kiện này và các sự kiện sau'),
-          ),
-          RadioListTile<RecurrenceScope>(
-            dense: true,
-            value: RecurrenceScope.series,
-            groupValue: _scope,
-            onChanged: (v) => setState(() => _scope = v!),
-            title: const Text('Tất cả sự kiện trong chuỗi'),
-          ),
+          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.single, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Chỉ sự kiện này')),
+          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.future, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Sự kiện này và các sự kiện sau')),
+          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.series, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Tất cả sự kiện trong chuỗi')),
         ],
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
         widget.isDestructive
-            ? FilledButton(
-                style: FilledButton.styleFrom(
-                    backgroundColor: scheme.error,
-                    foregroundColor: scheme.onError),
-                onPressed: () => Navigator.pop(context, _scope),
-                child: Text(widget.confirmLabel),
-              )
-            : FilledButton(
-                onPressed: () => Navigator.pop(context, _scope),
-                child: Text(widget.confirmLabel),
-              ),
+            ? FilledButton(style: FilledButton.styleFrom(backgroundColor: scheme.error, foregroundColor: scheme.onError), onPressed: () => Navigator.pop(context, _scope), child: Text(widget.confirmLabel))
+            : FilledButton(onPressed: () => Navigator.pop(context, _scope), child: Text(widget.confirmLabel)),
       ],
     );
   }
@@ -466,20 +422,10 @@ class _SearchDialogState extends State<_SearchDialog> {
   final _controller = TextEditingController();
   List<NextAEvent> _results = const [];
   Timer? _debounce;
-
   @override
-  void initState() {
-    super.initState();
-    _search();
-  }
-
+  void initState() { super.initState(); _search(); }
   @override
-  void dispose() {
-    _debounce?.cancel();
-    _controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _debounce?.cancel(); _controller.dispose(); super.dispose(); }
   void _search() {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 180), () async {
@@ -487,13 +433,11 @@ class _SearchDialogState extends State<_SearchDialog> {
       if (mounted) setState(() => _results = results);
     });
   }
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Dialog(
-      insetPadding:
-          const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 430, maxHeight: 560),
         child: SafeArea(
@@ -502,51 +446,26 @@ class _SearchDialogState extends State<_SearchDialog> {
             child: Column(
               children: [
                 Row(children: [
-                  const Expanded(
-                      child: Text('Tìm kiếm',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700))),
-                  IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded))
+                  const Expanded(child: Text('Tìm kiếm', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
+                  IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded))
                 ]),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  onChanged: (_) => _search(),
-                  decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search_rounded),
-                      hintText: 'Tên, địa điểm hoặc ghi chú'),
-                ),
+                TextField(controller: _controller, autofocus: true, onChanged: (_) => _search(), decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Tên, địa điểm hoặc ghi chú')),
                 const SizedBox(height: 12),
                 Expanded(
                   child: _results.isEmpty
-                      ? Center(
-                          child: Text('Không tìm thấy sự kiện',
-                              style: TextStyle(
-                                  color: scheme.onSurfaceVariant)))
+                      ? Center(child: Text('Không tìm thấy sự kiện', style: TextStyle(color: scheme.onSurfaceVariant)))
                       : ListView.separated(
                           padding: EdgeInsets.zero,
                           itemCount: _results.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
+                          separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (_, i) {
                             final e = _results[i];
                             return ListTile(
-                              contentPadding:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 2, vertical: 2),
-                              title: Text(e.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                              subtitle: Text(
-                                  '${e.start.day}/${e.start.month}/${e.start.year} · ${e.location ?? 'Không có địa điểm'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                              onTap: () =>
-                                  Navigator.pop(context, e),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                              title: Text(e.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text('${e.start.day}/${e.start.month}/${e.start.year} · ${e.location ?? 'Không có địa điểm'}', maxLines: 1, overflow: TextOverflow.ellipsis),
+                              onTap: () => Navigator.pop(context, e),
                             );
                           }),
                 ),
@@ -560,32 +479,20 @@ class _SearchDialogState extends State<_SearchDialog> {
 }
 
 class _SeedColorButton extends StatelessWidget {
-  const _SeedColorButton(
-      {required this.color, required this.onSelected});
+  const _SeedColorButton({required this.color, required this.onSelected});
   final Color color;
   final ValueChanged<Color>? onSelected;
   @override
   Widget build(BuildContext context) => GestureDetector(
-      onTap: () {
-        onSelected?.call(color);
-        Navigator.pop(context);
-      },
+      onTap: () { onSelected?.call(color); Navigator.pop(context); },
       child: CircleAvatar(radius: 17, backgroundColor: color));
 }
 
 class PlannerTopBar extends StatelessWidget {
-  const PlannerTopBar({
-    super.key,
-    required this.monthLabel,
-    required this.today,
-    required this.onMenu,
-    required this.onSearch,
-    required this.onToday,
-  });
+  const PlannerTopBar({super.key, required this.monthLabel, required this.today, required this.onMenu, required this.onSearch, required this.onToday});
   final String monthLabel;
   final int today;
   final VoidCallback onMenu, onSearch, onToday;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -593,23 +500,16 @@ class PlannerTopBar extends StatelessWidget {
       height: 64,
       child: Row(
         children: [
-          IconButton(
-              onPressed: onMenu,
-              icon: const Icon(Icons.menu_rounded)),
+          IconButton(onPressed: onMenu, icon: const Icon(Icons.menu_rounded)),
           const Spacer(),
-          Text(monthLabel,
-              style: const TextStyle(
-                  fontSize: 21, fontWeight: FontWeight.w700)),
+          Text(monthLabel, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
           const Spacer(),
-          IconButton(
-              onPressed: onSearch,
-              icon: const Icon(Icons.search_rounded)),
+          IconButton(onPressed: onSearch, icon: const Icon(Icons.search_rounded)),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Material(
               color: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               child: InkWell(
                 onTap: onToday,
                 borderRadius: BorderRadius.circular(10),
@@ -617,14 +517,8 @@ class PlannerTopBar extends StatelessWidget {
                   width: 38,
                   height: 38,
                   alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                      border: Border.all(
-                          color: scheme.outline, width: 1.5),
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Text('$today',
-                      style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800)),
+                  decoration: BoxDecoration(border: Border.all(color: scheme.outline, width: 1.5), borderRadius: BorderRadius.circular(10)),
+                  child: Text('$today', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                 ),
               ),
             ),
@@ -636,8 +530,7 @@ class PlannerTopBar extends StatelessWidget {
 }
 
 class PlannerFab extends StatelessWidget {
-  const PlannerFab(
-      {super.key, required this.label, required this.onTap});
+  const PlannerFab({super.key, required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
   @override
@@ -661,12 +554,7 @@ class PlannerFab extends StatelessWidget {
               children: [
                 const Icon(Icons.add_rounded, size: 18),
                 const SizedBox(width: 6),
-                Flexible(
-                    child: Text(label,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13))),
+                Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
               ],
             ),
           ),
