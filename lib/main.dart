@@ -203,7 +203,7 @@ List<NextAEvent> _buildDemoEvents() {
         start: DateTime(2026, 10, 15, 9, 30), end: DateTime(2026, 10, 15, 12),
         location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
     base(id: 'tmdt_20261022', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent,
-        start: DateTime(2026, 9, 17, 9, 30), end: DateTime(2026, 9, 17, 12),
+        start: DateTime(2026, 10, 22, 9, 30), end: DateTime(2026, 10, 22, 12),
         location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
     base(id: 'tmdt_20261029', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent,
         start: DateTime(2026, 10, 29, 9, 30), end: DateTime(2026, 10, 29, 12),
