@@ -43,6 +43,11 @@
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
 
+        <!-- Native receiver used to speak reminder text when Flutter is not running. -->
+        <receiver
+            android:name="com.nexta.AlarmTtsReceiver"
+            android:exported="false" />
+
         <receiver android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="true">
             <intent-filter>
