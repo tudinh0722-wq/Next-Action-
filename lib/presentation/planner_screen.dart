@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../application/alarm_scheduler.dart';
+import '../application/bulk_import_service.dart';
 import '../application/countdown_policy.dart';
 import '../application/recurrence_service.dart';
 import '../application/tts_service.dart';
@@ -46,6 +47,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   final _countdownPolicy = const CountdownPolicy();
   Timer? _countdownTimer;
   late RecurrenceService _recurrenceService;
+  late BulkImportService _bulkImportService;
   static const _pageAnimationDuration = Duration(milliseconds: 420);
 
   @override
@@ -56,6 +58,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     _month = DateTime(now.year, now.month);
     _events = List.of(widget.events);
     _recurrenceService = RecurrenceService(
+      database: widget.database,
+      scheduler: widget.scheduler,
+    );
+    _bulkImportService = BulkImportService(
       database: widget.database,
       scheduler: widget.scheduler,
     );
@@ -124,8 +130,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
   }
 
-  // ── Scope pickers ────────────────────────────────────────────────────────────
-
   Future<RecurrenceScope?> _pickDeleteScope(NextAEvent event) async {
     if (event.recurrenceId == null) return RecurrenceScope.single;
     return showDialog<RecurrenceScope>(
@@ -150,10 +154,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
   }
 
-  // ── Edit/delete orchestration ─────────────────────────────────────────────
+  Future<void> _reloadEvents() async {
+    final events = await widget.database.getAll();
+    if (!mounted) return;
+    setState(() {
+      _events = events;
+      _events.sort((a, b) => a.start.compareTo(b.start));
+    });
+  }
 
   Future<void> _editEvent(NextAEvent? event) async {
-    // If this is an existing recurring event, first ask what scope to edit.
     RecurrenceScope? editScope;
     if (event != null && event.recurrenceId != null) {
       editScope = await _pickEditScope(event);
@@ -161,12 +171,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
 
     final result = await showEventEditor(
-        context,
-        event: event,
-        selectedDay: _selected);
+      context,
+      event: event,
+      selectedDay: _selected,
+      importService: event == null ? _bulkImportService : null,
+    );
     if (!mounted || result == null) return;
 
-    // ── Delete branch ──────────────────────────────────────────────────────
     if (result.deleted && event != null) {
       final scope = await _pickDeleteScope(event);
       if (!mounted || scope == null) return;
@@ -180,7 +191,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     if (result.events.isEmpty) return;
 
-    // ── Edit branch ────────────────────────────────────────────────────────
     if (event != null) {
       final scope = editScope ?? RecurrenceScope.single;
       final edited = result.events.first;
@@ -195,7 +205,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
       return;
     }
 
-    // ── New event branch ───────────────────────────────────────────────────
     await widget.database.upsertAll(result.events);
     for (final e in result.events) {
       await widget.scheduler.scheduleEvent(e);
@@ -209,8 +218,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   Future<void> _addEventForDay(DateTime day) async {
     final result = await showEventEditor(
-        context,
-        selectedDay: DateTime(day.year, day.month, day.day));
+      context,
+      selectedDay: DateTime(day.year, day.month, day.day),
+      importService: _bulkImportService,
+    );
     if (!mounted || result == null || result.events.isEmpty) return;
     await widget.database.upsertAll(result.events);
     for (final e in result.events) {
@@ -375,8 +386,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 }
 
-// ── Scope dialog ─────────────────────────────────────────────────────────────
-
 class _ScopeDialog extends StatefulWidget {
   const _ScopeDialog({
     required this.title,
@@ -445,8 +454,6 @@ class _ScopeDialogState extends State<_ScopeDialog> {
     );
   }
 }
-
-// ── Supporting widgets (unchanged visual baseline) ────────────────────────────
 
 class _SearchDialog extends StatefulWidget {
   const _SearchDialog({required this.database});
