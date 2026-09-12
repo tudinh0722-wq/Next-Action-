@@ -23,12 +23,18 @@ Future<void> main() async {
     await database.replaceAll(events);
   }
 
-  // Debug builds always get one fresh, deterministic alarm test event.
-  // This is intentionally in Flutter, not the legacy Kotlin app.
+  // Debug builds get one deterministic alarm test event only once.
+  // Do not recreate it on every app launch: doing so would move the event
+  // forward by 5 minutes every time the app is opened and reschedule its alarm.
+  // Delete the test event manually if a fresh debug alarm run is needed.
   if (kDebugMode) {
-    final testEvent = _buildDebugAlarmTestEvent();
-    await database.upsert(testEvent);
-    events = await database.getAll();
+    final hasDebugAlarm =
+        events.any((event) => event.id == '__nexta_debug_alarm_test__');
+    if (!hasDebugAlarm) {
+      final testEvent = _buildDebugAlarmTestEvent();
+      await database.upsert(testEvent);
+      events = await database.getAll();
+    }
   }
 
   runApp(NextAApp(
@@ -197,7 +203,7 @@ List<NextAEvent> _buildDemoEvents() {
         start: DateTime(2026, 10, 15, 9, 30), end: DateTime(2026, 10, 15, 12),
         location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
     base(id: 'tmdt_20261022', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent,
-        start: DateTime(2026, 10, 22, 9, 30), end: DateTime(2026, 10, 22, 12),
+        start: DateTime(2026, 9, 17, 9, 30), end: DateTime(2026, 9, 17, 12),
         location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
     base(id: 'tmdt_20261029', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent,
         start: DateTime(2026, 10, 29, 9, 30), end: DateTime(2026, 10, 29, 12),
