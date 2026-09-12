@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -29,16 +31,17 @@ Future<void> main() async {
     events = await database.getAll();
   }
 
-  // Wait for scheduling so the first debug build cannot open with an
-  // apparently-created test event whose alarms have not been registered yet.
-  await scheduler.scheduleAll(events);
-
   runApp(NextAApp(
     database: database,
     scheduler: scheduler,
     tts: tts,
     initialEvents: events,
   ));
+
+  // Scheduling is deliberately started after runApp so a system permission
+  // screen cannot block the first Flutter frame. The scheduler still restores
+  // all future alarms on every app launch.
+  unawaited(scheduler.scheduleAll(events));
 }
 
 NextAEvent _buildDebugAlarmTestEvent() {
