@@ -1,6 +1,5 @@
-﻿import 'dart:async';
+import 'dart:async';
 
-import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -14,16 +13,24 @@ import 'tts_service.dart';
 
 /// Schedules local notification alarms for [NextAEvent].
 ///
-/// The scheduler deliberately uses the device IANA timezone and
-/// `zonedSchedule`, so an event's wall-clock time is preserved correctly.
+/// Android uses exact, while-idle scheduling and dedicated alarm notification
+/// channels. The channel audio attributes use the Android alarm stream so a
+/// reminder is not silently routed to a muted notification channel.
 class AlarmScheduler {
   AlarmScheduler._(this._plugin, this._tts);
 
   final FlutterLocalNotificationsPlugin _plugin;
   final TtsService _tts;
 
+  static const _defaultChannelId = 'nexta_reminder_v3_default';
+  static const _highChannelId = 'nexta_reminder_v3_high';
+  static const _maxChannelId = 'nexta_reminder_v3_max';
+  static const _channelName = 'NextA - Nhắc sự kiện';
+  static const _channelDescription = 'Nhắc trước khi sự kiện bắt đầu';
+
   static AlarmScheduler? _instance;
   static bool _timezoneReady = false;
+  static bool _exactAlarmPermissionPrompted = false;
 
   static Future<AlarmScheduler> init(TtsService tts) async {
     if (_instance != null) return _instance!;
@@ -50,9 +57,55 @@ class AlarmScheduler {
       onDidReceiveBackgroundNotificationResponse: _backgroundTap,
     );
 
+    await _configureAndroidChannels(plugin);
+
     _instance = AlarmScheduler._(plugin, tts);
     await _instance!._requestPermissions();
     return _instance!;
+  }
+
+  static Future<void> _configureAndroidChannels(
+      FlutterLocalNotificationsPlugin plugin) async {
+    final android = plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (android == null) return;
+
+    // Use a new channel generation deliberately. Android persists channel
+    // sound/importance settings, so changing Dart details cannot repair an
+    // already-created channel that the user/system configured as silent.
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _defaultChannelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.defaultImportance,
+        playSound: true,
+        enableVibration: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _highChannelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+    await android.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _maxChannelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
   }
 
   static void _initTimezone() {
@@ -82,24 +135,47 @@ class AlarmScheduler {
 
     await androidImpl.requestNotificationsPermission();
 
+    // Do not force the user into Android Settings during app startup. Exact
+    // alarm access is requested lazily when an event actually needs an alarm.
     final hasExact =
         await androidImpl.canScheduleExactNotifications() ?? false;
-    if (hasExact) return;
+    if (!hasExact) {
+      debugPrint('NextA exact alarm permission is not currently granted.');
+    }
+  }
 
-    const intent = AndroidIntent(
-      action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
-    );
-    await intent.launch();
+  Future<bool> _ensureExactAlarmPermission() async {
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidImpl == null) return true;
 
-    const maxWait = Duration(seconds: 30);
+    final granted =
+        await androidImpl.canScheduleExactNotifications() ?? false;
+    if (granted) return true;
+
+    if (!_exactAlarmPermissionPrompted) {
+      _exactAlarmPermissionPrompted = true;
+      try {
+        await androidImpl.requestExactAlarmsPermission();
+      } catch (e) {
+        debugPrint('NextA exact alarm permission request failed: $e');
+      }
+    }
+
+    // Give the user time to return from the system permission screen. This is
+    // only used when scheduling an actual reminder, never during app startup.
+    const maxWait = Duration(seconds: 45);
     const interval = Duration(seconds: 1);
     final deadline = DateTime.now().add(maxWait);
     while (DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(interval);
-      final granted =
+      final nowGranted =
           await androidImpl.canScheduleExactNotifications() ?? false;
-      if (granted) break;
+      if (nowGranted) return true;
     }
+
+    debugPrint('NextA exact alarm permission was not granted.');
+    return false;
   }
 
   static Future<void> _handleResponse(
@@ -139,12 +215,16 @@ class AlarmScheduler {
     if (event.reminderMinutes <= 0) return;
 
     await _syncTimezone();
-    await cancelEvent(event.id);
 
     final now = DateTime.now();
     final firstAlarm =
         event.start.subtract(Duration(minutes: event.reminderMinutes));
     if (!firstAlarm.isAfter(now)) return;
+
+    // Keep already-scheduled alarms intact if exact-alarm access is unavailable.
+    if (!await _ensureExactAlarmPermission()) return;
+
+    await cancelEvent(event.id);
 
     final totalSlots = 1 + event.reminderRepeatCount.clamp(0, 10);
     for (var slot = 0; slot < totalSlots; slot++) {
@@ -175,7 +255,8 @@ class AlarmScheduler {
         scheduledDate,
         _details(event.priority),
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
     }
@@ -216,14 +297,19 @@ class AlarmScheduler {
         '${event.start.hour.toString().padLeft(2, '0')}:${event.start.minute.toString().padLeft(2, '0')}';
     final reminder = minutesBefore > 0
         ? (minutesBefore < 60
-            ? '$minutesBefore phÃºt ná»¯a'
-            : '${minutesBefore ~/ 60}h${minutesBefore % 60 > 0 ? '${minutesBefore % 60}p' : ''} ná»¯a')
-        : 'Äang diá»…n ra';
-    final context = parts.isEmpty ? '' : '${parts.join(' Â· ')} Â· ';
+            ? '$minutesBefore phút nữa'
+            : '${minutesBefore ~/ 60}h${minutesBefore % 60 > 0 ? '${minutesBefore % 60}p' : ''} nữa')
+        : 'Đang diễn ra';
+    final context = parts.isEmpty ? '' : '${parts.join(' · ')} · ';
     return '$context$timeStr ($reminder)';
   }
 
   NotificationDetails _details(int priority) {
+    final channelId = priority >= 2
+        ? _maxChannelId
+        : priority == 1
+            ? _highChannelId
+            : _defaultChannelId;
     final importance = priority >= 2
         ? Importance.max
         : priority == 1
@@ -237,10 +323,9 @@ class AlarmScheduler {
 
     return NotificationDetails(
       android: AndroidNotificationDetails(
-        'nexta_reminder_v2',
-        'Nháº¯c nhá»Ÿ sá»± kiá»‡n',
-        channelDescription:
-            'ThÃ´ng bÃ¡o nháº¯c nhá»Ÿ trÆ°á»›c khi sá»± kiá»‡n báº¯t Ä‘áº§u',
+        channelId,
+        _channelName,
+        channelDescription: _channelDescription,
         importance: importance,
         priority: notifPriority,
         playSound: true,
@@ -257,4 +342,3 @@ class AlarmScheduler {
     );
   }
 }
-
