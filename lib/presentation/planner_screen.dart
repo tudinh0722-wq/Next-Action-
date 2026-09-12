@@ -81,8 +81,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
     _countdownTimer = Timer(Duration(seconds: seconds), () {
       if (!mounted) return;
       setState(() {});
-      _countdownTimer =
-          Timer.periodic(const Duration(minutes: 1), (_) {
+      _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
         if (mounted) setState(() {});
       });
     });
@@ -164,12 +163,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
   }
 
   Future<void> _editEvent(NextAEvent? event) async {
-    RecurrenceScope? editScope;
-    if (event != null && event.recurrenceId != null) {
-      editScope = await _pickEditScope(event);
-      if (!mounted || editScope == null) return;
-    }
-
+    // Scope is deliberately chosen after the edit action has been selected.
+    // This avoids asking a user to choose a scope before they have even
+    // decided whether they want to edit or delete the event.
     final result = await showEventEditor(
       context,
       event: event,
@@ -186,8 +182,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
       final scope = await _pickDeleteScope(event);
       if (!mounted || scope == null) return;
 
-      final removed =
-          await _recurrenceService.delete(event, scope, _events);
+      final removed = await _recurrenceService.delete(event, scope, _events);
       if (!mounted) return;
       setState(() => _events.removeWhere((e) => removed.contains(e.id)));
       return;
@@ -196,7 +191,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
     if (result.events.isEmpty) return;
 
     if (event != null) {
-      final scope = editScope ?? RecurrenceScope.single;
+      final scope = await _pickEditScope(event);
+      if (!mounted || scope == null) return;
+
       final edited = result.events.first;
       final editResult =
           await _recurrenceService.edit(event, edited, scope, _events);
