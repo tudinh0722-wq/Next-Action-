@@ -493,27 +493,44 @@ class _EditorTextField extends StatelessWidget {
   final TextInputAction? textInputAction;
 
   @override
-  Widget build(BuildContext context) => TextField(
-        controller: controller,
-        maxLength: maxLength,
-        minLines: minLines,
-        maxLines: maxLines,
-        textInputAction: textInputAction,
-        decoration: InputDecoration(
-          prefixIcon: SizedBox(
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: maxLines > 1 ? 72 : 48,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 40,
+            height: 48,
+          ),
+          SizedBox(
             width: 40,
             height: 48,
             child: Center(child: Icon(icon)),
           ),
-          prefixIconConstraints: const BoxConstraints.tightFor(width: 40, height: 48),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          counterText: '',
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          hintText: hintText,
-        ),
-      );
+          const SizedBox(width: 0),
+          Expanded(
+            child: TextField(
+              controller: controller,
+              maxLength: maxLength,
+              minLines: minLines,
+              maxLines: maxLines,
+              textInputAction: textInputAction,
+              decoration: InputDecoration(
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                counterText: '',
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                hintText: hintText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EditorOptionTile extends StatelessWidget {
