@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -11,21 +12,19 @@ import 'tts_service.dart';
 
 // Payload format: "eventId|slotIndex|minutesBefore|title|note"
 
-/// Schedules local notification alarms for [NextAEvent].
+/// Schedules local notification alarms and native Android TTS alarms for
+/// [NextAEvent].
 ///
-/// Android uses exact, while-idle scheduling and dedicated alarm notification
-/// channels. The channel audio attributes use the Android alarm stream so a
-/// reminder is not silently routed to a muted notification channel.
+/// Android uses exact, while-idle scheduling. The notification is handled by
+/// flutter_local_notifications, while speech is scheduled through a small
+/// native Kotlin receiver so it can run when Flutter is in the background or
+/// not running at all.
 class AlarmScheduler {
   AlarmScheduler._(this._plugin, this._tts);
 
   final FlutterLocalNotificationsPlugin _plugin;
   final TtsService _tts;
 
-  // Use a new channel generation because Android persists the sound selected
-  // for a channel after its first creation. The explicit system alarm URI is
-  // important on Samsung/One UI: it avoids relying on the default notification
-  // sound while AudioAttributesUsage.alarm routes playback to Alarm volume.
   static const _defaultChannelId = 'nexta_reminder_v4_default';
   static const _highChannelId = 'nexta_reminder_v4_high';
   static const _maxChannelId = 'nexta_reminder_v4_max';
@@ -33,6 +32,9 @@ class AlarmScheduler {
   static const _channelDescription = 'Nhắc trước khi sự kiện bắt đầu';
   static const AndroidNotificationSound _alarmSound =
       UriAndroidNotificationSound('content://settings/system/alarm_alert');
+
+  static const MethodChannel _nativeTtsChannel =
+      MethodChannel('com.nexta/alarm_tts');
 
   static AlarmScheduler? _instance;
   static bool _timezoneReady = false;
@@ -45,7 +47,11 @@ class AlarmScheduler {
 
     final plugin = FlutterLocalNotificationsPlugin();
 
-    void onResponse(NotificationResponse r) => _handleResponse(tts, r);
+    void onResponse(NotificationResponse r) {
+      // TTS is scheduled natively with the alarm itself. Tapping the
+      // notification must not trigger a second announcement.
+      _handleResponse(tts, r);
+    }
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     const darwinInit = DarwinInitializationSettings(
@@ -76,9 +82,6 @@ class AlarmScheduler {
         AndroidFlutterLocalNotificationsPlugin>();
     if (android == null) return;
 
-    // Use a new channel generation deliberately. Android persists channel
-    // sound/importance settings, so changing Dart details cannot repair an
-    // already-created channel that the user/system configured as silent.
     await android.createNotificationChannel(
       const AndroidNotificationChannel(
         _defaultChannelId,
@@ -123,16 +126,12 @@ class AlarmScheduler {
     _timezoneReady = true;
   }
 
-  /// Refreshes the timezone from the OS before scheduling. This matters when
-  /// the user travels or changes the device timezone while the app is open.
   static Future<void> _syncTimezone() async {
     _initTimezone();
     try {
       final info = await FlutterTimezone.getLocalTimezone();
       tz.setLocalLocation(tz.getLocation(info.identifier));
     } catch (e) {
-      // The bundled database still has a safe default. Do not prevent the
-      // planner from opening just because a platform timezone lookup failed.
       debugPrint('NextA alarm timezone lookup failed: $e');
     }
   }
@@ -144,8 +143,6 @@ class AlarmScheduler {
 
     await androidImpl.requestNotificationsPermission();
 
-    // Do not force the user into Android Settings during app startup. Exact
-    // alarm access is requested lazily when an event actually needs an alarm.
     final hasExact =
         await androidImpl.canScheduleExactNotifications() ?? false;
     if (!hasExact) {
@@ -162,8 +159,6 @@ class AlarmScheduler {
         await androidImpl.canScheduleExactNotifications() ?? false;
     if (granted) return true;
 
-    // Ask only once per app process. If the user does not grant it, do not
-    // block startup or every subsequent event for another 45 seconds.
     if (_exactAlarmPermissionPrompted) {
       debugPrint('NextA exact alarm permission is still not granted.');
       return false;
@@ -177,8 +172,6 @@ class AlarmScheduler {
       return false;
     }
 
-    // Give the user time to return from the system permission screen. This is
-    // only used when scheduling an actual reminder, never during app startup.
     const maxWait = Duration(seconds: 45);
     const interval = Duration(seconds: 1);
     final deadline = DateTime.now().add(maxWait);
@@ -195,35 +188,14 @@ class AlarmScheduler {
 
   static Future<void> _handleResponse(
       TtsService tts, NotificationResponse r) async {
-    final parts = (r.payload ?? '').split('|');
-    if (parts.length < 5) return;
-    final slotIndex = int.tryParse(parts[1]) ?? 0;
-    final minutesBefore = int.tryParse(parts[2]) ?? 0;
-    final title = parts[3];
-    final note = parts[4].isNotEmpty ? parts[4] : null;
-
-    final preText = TtsService.buildAnnouncement(
-      title: title,
-      note: note,
-      minutesBefore: minutesBefore,
-      isRepeat: slotIndex > 0,
-    );
-    await tts.speak(preText);
-
-    if (slotIndex == 0) {
-      await Future<void>.delayed(const Duration(milliseconds: 800));
-      final postText = TtsService.buildAnnouncement(
-        title: title,
-        note: note,
-        isRepeat: true,
-      );
-      await tts.speak(postText);
-    }
+    // Native Android TTS already speaks at the scheduled alarm time. Keep this
+    // callback silent so opening/tapping a notification never causes a second
+    // TTS announcement.
   }
 
   @pragma('vm:entry-point')
   static void _backgroundTap(NotificationResponse r) {
-    // TTS is intentionally not started from a notification background isolate.
+    // Native TTS is independent of the Flutter background isolate.
   }
 
   Future<void> scheduleEvent(NextAEvent event) async {
@@ -236,7 +208,6 @@ class AlarmScheduler {
         event.start.subtract(Duration(minutes: event.reminderMinutes));
     if (!firstAlarm.isAfter(now)) return;
 
-    // Keep already-scheduled alarms intact if exact-alarm access is unavailable.
     if (!await _ensureExactAlarmPermission()) return;
 
     await cancelEvent(event.id);
@@ -274,13 +245,82 @@ class AlarmScheduler {
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
+
+      // Schedule speech through the native Kotlin receiver at exactly the
+      // same instant as the notification. Flutter does not need to remain
+      // alive for this part.
+      await _scheduleNativeTts(event, slot, minutesBefore, alarmTime);
     }
+  }
+
+  Future<void> _scheduleNativeTts(
+    NextAEvent event,
+    int slot,
+    int minutesBefore,
+    DateTime alarmTime,
+  ) async {
+    final text = _buildNativeAnnouncement(
+      event,
+      slot: slot,
+      minutesBefore: minutesBefore,
+    );
+    try {
+      await _nativeTtsChannel.invokeMethod<void>('schedule', {
+        'requestKey': '${event.id}:$slot',
+        'atMillis': alarmTime.millisecondsSinceEpoch,
+        'text': text,
+      });
+    } catch (e) {
+      // Notification alarms must still work if the native TTS bridge fails.
+      debugPrint('NextA native TTS schedule failed: $e');
+    }
+  }
+
+  String _buildNativeAnnouncement(
+    NextAEvent event, {
+    required int slot,
+    required int minutesBefore,
+  }) {
+    final buffer = StringBuffer();
+
+    if (slot > 0) {
+      buffer.write('Nhắc lại. ');
+    } else if (minutesBefore > 0) {
+      if (minutesBefore < 60) {
+        buffer.write('Còn $minutesBefore phút nữa. ');
+      } else {
+        final hours = minutesBefore ~/ 60;
+        final minutes = minutesBefore % 60;
+        buffer.write('Còn $hours tiếng');
+        if (minutes > 0) buffer.write(' $minutes phút');
+        buffer.write(' nữa. ');
+      }
+    }
+
+    buffer.write('${event.title}.');
+    if (event.location != null && event.location!.trim().isNotEmpty) {
+      buffer.write(' Địa điểm: ${event.location!.trim()}.');
+    }
+    if (event.note != null && event.note!.trim().isNotEmpty) {
+      buffer.write(' ${event.note!.trim()}.');
+    }
+
+    // Keep a very long note from turning one alarm into a long-running speech.
+    final result = buffer.toString().trim();
+    return result.length <= 320 ? result : '${result.substring(0, 317)}...';
   }
 
   Future<void> cancelEvent(String eventId) async {
     const maxSlots = 11;
     for (var slot = 0; slot < maxSlots; slot++) {
       await _plugin.cancel(_notifId(eventId, slot));
+      try {
+        await _nativeTtsChannel.invokeMethod<void>('cancel', {
+          'requestKey': '$eventId:$slot',
+        });
+      } catch (e) {
+        debugPrint('NextA native TTS cancel failed: $e');
+      }
     }
   }
 
