@@ -1,0 +1,3 @@
+# NextA
+
+Flutter planner application.
