@@ -46,7 +46,7 @@ Future<EventEditorResult?> showEventEditor(
         context: context,
         builder: (c) => AlertDialog(
           title: const Text('Xóa sự kiện?'),
-          content: Text('Xóa “${event.title}” khỏi lịch?'),
+          content: Text('Xóa "${event.title}" khỏi lịch?'),
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
             FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Xóa')),
@@ -499,16 +499,12 @@ class _EditorTextField extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(
-            width: 40,
-            height: 48,
-          ),
           SizedBox(
             width: 40,
             height: 48,
             child: Center(child: Icon(icon)),
           ),
-          const SizedBox(width: 0),
+          const SizedBox(width: 16),
           Expanded(
             child: TextField(
               controller: controller,
