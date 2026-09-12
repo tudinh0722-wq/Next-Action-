@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../application/alarm_scheduler.dart';
 import '../application/countdown_policy.dart';
+import '../application/recurrence_service.dart';
 import '../application/tts_service.dart';
 import '../data/event_database.dart';
 import '../domain/event.dart';
@@ -44,6 +45,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
   bool _expanded = true;
   final _countdownPolicy = const CountdownPolicy();
   Timer? _countdownTimer;
+  late RecurrenceService _recurrenceService;
   static const _pageAnimationDuration = Duration(milliseconds: 420);
 
   @override
@@ -53,6 +55,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     _selected = DateTime(now.year, now.month, now.day);
     _month = DateTime(now.year, now.month);
     _events = List.of(widget.events);
+    _recurrenceService = RecurrenceService(
+      database: widget.database,
+      scheduler: widget.scheduler,
+    );
     _startCountdownTicker();
   }
 
@@ -118,102 +124,84 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
   }
 
-  Future<String?> _pickDeleteScope(NextAEvent event) async {
-    if (event.recurrenceId == null) return 'single';
-    return showDialog<String>(
+  // ── Scope pickers ────────────────────────────────────────────────────────────
+
+  Future<RecurrenceScope?> _pickDeleteScope(NextAEvent event) async {
+    if (event.recurrenceId == null) return RecurrenceScope.single;
+    return showDialog<RecurrenceScope>(
       context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Xóa sự kiện lặp'),
-        content: RadioGroup<String>(
-          groupValue: 'single',
-          onChanged: (_) {},
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RadioListTile<String>(
-                  value: 'single',
-                  title: const Text('Chỉ sự kiện này'),
-                  groupValue: 'single',
-                  onChanged: (_) => Navigator.pop(c, 'single')),
-              RadioListTile<String>(
-                  value: 'future',
-                  title:
-                      const Text('Sự kiện này và các sự kiện sau'),
-                  groupValue: 'single',
-                  onChanged: (_) => Navigator.pop(c, 'future')),
-              RadioListTile<String>(
-                  value: 'series',
-                  title: const Text('Tất cả sự kiện trong chuỗi'),
-                  groupValue: 'single',
-                  onChanged: (_) => Navigator.pop(c, 'series')),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(c),
-              child: const Text('Hủy'))
-        ],
+      builder: (c) => _ScopeDialog(
+        title: 'Xóa sự kiện lặp',
+        confirmLabel: 'Xóa',
+        isDestructive: true,
       ),
     );
   }
 
+  Future<RecurrenceScope?> _pickEditScope(NextAEvent event) async {
+    if (event.recurrenceId == null) return RecurrenceScope.single;
+    return showDialog<RecurrenceScope>(
+      context: context,
+      builder: (c) => _ScopeDialog(
+        title: 'Chỉnh sửa sự kiện lặp',
+        confirmLabel: 'Tiếp tục',
+        isDestructive: false,
+      ),
+    );
+  }
+
+  // ── Edit/delete orchestration ─────────────────────────────────────────────
+
   Future<void> _editEvent(NextAEvent? event) async {
+    // If this is an existing recurring event, first ask what scope to edit.
+    RecurrenceScope? editScope;
+    if (event != null && event.recurrenceId != null) {
+      editScope = await _pickEditScope(event);
+      if (!mounted || editScope == null) return;
+    }
+
     final result = await showEventEditor(
         context,
         event: event,
         selectedDay: _selected);
     if (!mounted || result == null) return;
 
+    // ── Delete branch ──────────────────────────────────────────────────────
     if (result.deleted && event != null) {
       final scope = await _pickDeleteScope(event);
       if (!mounted || scope == null) return;
 
-      if (scope == 'series' && event.recurrenceId != null) {
-        await widget.database.deleteSeries(event.recurrenceId!);
-        if (!mounted) return;
-        final removed = _events
-            .where((e) => e.recurrenceId == event.recurrenceId)
-            .toList();
-        for (final e in removed) {
-          await widget.scheduler.cancelEvent(e.id);
-        }
-        setState(() => _events
-            .removeWhere((e) => e.recurrenceId == event.recurrenceId));
-      } else if (scope == 'future' && event.recurrenceId != null) {
-        await widget.database
-            .deleteSeriesFrom(event.recurrenceId!, event.start);
-        if (!mounted) return;
-        final removed = _events
-            .where((e) =>
-                e.recurrenceId == event.recurrenceId &&
-                !e.start.isBefore(event.start))
-            .toList();
-        for (final e in removed) {
-          await widget.scheduler.cancelEvent(e.id);
-        }
-        setState(() => _events.removeWhere((e) =>
-            e.recurrenceId == event.recurrenceId &&
-            !e.start.isBefore(event.start)));
-      } else {
-        await widget.database.delete(event.id);
-        await widget.scheduler.cancelEvent(event.id);
-        if (!mounted) return;
-        setState(() => _events.removeWhere((e) => e.id == event.id));
-      }
+      final removed =
+          await _recurrenceService.delete(event, scope, _events);
+      if (!mounted) return;
+      setState(() => _events.removeWhere((e) => removed.contains(e.id)));
       return;
     }
 
     if (result.events.isEmpty) return;
+
+    // ── Edit branch ────────────────────────────────────────────────────────
+    if (event != null) {
+      final scope = editScope ?? RecurrenceScope.single;
+      final edited = result.events.first;
+      final editResult =
+          await _recurrenceService.edit(event, edited, scope, _events);
+      if (!mounted) return;
+      setState(() {
+        _events.removeWhere((e) => editResult.toRemove.contains(e.id));
+        _events.addAll(editResult.toAdd);
+        _events.sort((a, b) => a.start.compareTo(b.start));
+      });
+      return;
+    }
+
+    // ── New event branch ───────────────────────────────────────────────────
     await widget.database.upsertAll(result.events);
     for (final e in result.events) {
       await widget.scheduler.scheduleEvent(e);
     }
     if (!mounted) return;
     setState(() {
-      if (event != null) {
-        _events.removeWhere((e) => e.id == event.id);
-      }
       _events.addAll(result.events);
       _events.sort((a, b) => a.start.compareTo(b.start));
     });
@@ -383,6 +371,77 @@ class _PlannerScreenState extends State<PlannerScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Scope dialog ─────────────────────────────────────────────────────────────
+
+class _ScopeDialog extends StatefulWidget {
+  const _ScopeDialog({
+    required this.title,
+    required this.confirmLabel,
+    required this.isDestructive,
+  });
+  final String title;
+  final String confirmLabel;
+  final bool isDestructive;
+
+  @override
+  State<_ScopeDialog> createState() => _ScopeDialogState();
+}
+
+class _ScopeDialogState extends State<_ScopeDialog> {
+  RecurrenceScope _scope = RecurrenceScope.single;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RadioListTile<RecurrenceScope>(
+            dense: true,
+            value: RecurrenceScope.single,
+            groupValue: _scope,
+            onChanged: (v) => setState(() => _scope = v!),
+            title: const Text('Chỉ sự kiện này'),
+          ),
+          RadioListTile<RecurrenceScope>(
+            dense: true,
+            value: RecurrenceScope.future,
+            groupValue: _scope,
+            onChanged: (v) => setState(() => _scope = v!),
+            title: const Text('Sự kiện này và các sự kiện sau'),
+          ),
+          RadioListTile<RecurrenceScope>(
+            dense: true,
+            value: RecurrenceScope.series,
+            groupValue: _scope,
+            onChanged: (v) => setState(() => _scope = v!),
+            title: const Text('Tất cả sự kiện trong chuỗi'),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy')),
+        widget.isDestructive
+            ? FilledButton(
+                style: FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError),
+                onPressed: () => Navigator.pop(context, _scope),
+                child: Text(widget.confirmLabel),
+              )
+            : FilledButton(
+                onPressed: () => Navigator.pop(context, _scope),
+                child: Text(widget.confirmLabel),
+              ),
+      ],
     );
   }
 }
