@@ -1,9 +1,11 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../application/bulk_import_service.dart';
 import '../../application/priority_color.dart';
 import '../../application/recurrence_policy.dart';
 import '../../domain/event.dart';
+import 'ai_import_sheet.dart';
 
 class EventEditorResult {
   const EventEditorResult({required this.events, required this.deleted});
@@ -16,6 +18,7 @@ Future<EventEditorResult?> showEventEditor(
   BuildContext context, {
   NextAEvent? event,
   required DateTime selectedDay,
+  BulkImportService? importService,
 }) async {
   if (event != null) {
     final action = await showModalBottomSheet<String>(
@@ -63,14 +66,23 @@ Future<EventEditorResult?> showEventEditor(
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _EventEditorSheet(event: event, selectedDay: selectedDay),
+    builder: (_) => _EventEditorSheet(
+      event: event,
+      selectedDay: selectedDay,
+      importService: importService,
+    ),
   );
 }
 
 class _EventEditorSheet extends StatefulWidget {
-  const _EventEditorSheet({required this.event, required this.selectedDay});
+  const _EventEditorSheet({
+    required this.event,
+    required this.selectedDay,
+    this.importService,
+  });
   final NextAEvent? event;
   final DateTime selectedDay;
+  final BulkImportService? importService;
 
   @override
   State<_EventEditorSheet> createState() => _EventEditorSheetState();
@@ -225,6 +237,8 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // Hide AI Import tab when no service is provided (editing existing event).
+    final showImportTab = widget.importService != null && widget.event == null;
     return Material(
       color: scheme.surface,
       child: SafeArea(
@@ -234,11 +248,18 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-              child: _EditorTabs(selectedBulk: _bulkImportTab, onChanged: (v) => setState(() => _bulkImportTab = v)),
+              child: showImportTab
+                  ? _EditorTabs(selectedBulk: _bulkImportTab, onChanged: (v) => setState(() => _bulkImportTab = v))
+                  : _SingleTabHeader(onClose: () => Navigator.pop(context)),
             ),
             Expanded(
-              child: _bulkImportTab
-                  ? const _BulkImportSlot()
+              child: _bulkImportTab && showImportTab
+                  ? AiImportSheet(
+                      service: widget.importService!,
+                      onImported: (summary) {
+                        // Sheet stays open to allow further imports.
+                      },
+                    )
                   : _EventContent(
                       title: _title,
                       location: _location,
@@ -264,6 +285,30 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── Single-tab header (used when editing existing event, no import tab) ───────
+
+class _SingleTabHeader extends StatelessWidget {
+  const _SingleTabHeader({required this.onClose});
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text('Chỉnh sửa sự kiện',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        ),
+        IconButton(
+          onPressed: onClose,
+          icon: const Icon(Icons.close_rounded),
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
     );
   }
 }
@@ -642,12 +687,6 @@ class _EditorTab extends StatelessWidget {
   }
 }
 
-class _BulkImportSlot extends StatelessWidget {
-  const _BulkImportSlot();
-  @override
-  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(24), child: Text('AI Import sẽ hỗ trợ nhập nhiều sự kiện từ nội dung lịch.', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))));
-}
-
 class _PriorityDot extends StatelessWidget {
   const _PriorityDot({required this.priority, this.size = 16});
   final int priority;
@@ -673,7 +712,7 @@ class _RecurrenceDialogState extends State<_RecurrenceDialog> {
 
   @override
   void initState() {
-    super.initState();
+    super.initState();;
     _frequency = widget.initial.frequency;
     _count = TextEditingController(text: '10');
     _until = _occurrenceDate(10);
