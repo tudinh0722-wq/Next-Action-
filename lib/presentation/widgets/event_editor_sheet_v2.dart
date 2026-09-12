@@ -32,26 +32,24 @@ Future<EventEditorResult?> showEventEditor(
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Chỉnh sửa sự kiện'),
-                onTap: () => Navigator.pop(sheetContext, 'edit'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline),
-                title: const Text('Xóa sự kiện'),
-                onTap: () => Navigator.pop(sheetContext, 'delete'),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Chỉnh sửa sự kiện'),
+              onTap: () => Navigator.pop(sheetContext, 'edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Xóa sự kiện'),
+              onTap: () => Navigator.pop(sheetContext, 'delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
 
     if (!context.mounted) return null;
@@ -232,11 +230,9 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     super.initState();
 
     final event = widget.event;
-
     _title = TextEditingController(text: event?.title ?? '');
     _location = TextEditingController(text: event?.location ?? '');
     _note = TextEditingController(text: event?.note ?? '');
-
     _start = event?.start ?? DateTime(
       widget.selectedDay.year,
       widget.selectedDay.month,
@@ -263,7 +259,6 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
 
   Future<void> _pickDate(bool start) async {
     final current = start ? _start : _end;
-
     final date = await showDatePicker(
       context: context,
       initialDate: current,
@@ -301,53 +296,51 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       context: context,
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: SizedBox(
-            height: 300,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Chọn thời gian',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: 300,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Chọn thời gian',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(sheetContext),
-                        child: const Text('Xong'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: const Text('Xong'),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: CupertinoDatePicker(
-                    mode: CupertinoDatePickerMode.time,
-                    use24hFormat: false,
-                    initialDateTime: current,
-                    onDateTimeChanged: (value) {
-                      picked = DateTime(
-                        current.year,
-                        current.month,
-                        current.day,
-                        value.hour,
-                        value.minute,
-                      );
-                    },
-                  ),
+              ),
+              Expanded(
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: false,
+                  initialDateTime: current,
+                  onDateTimeChanged: (value) {
+                    picked = DateTime(
+                      current.year,
+                      current.month,
+                      current.day,
+                      value.hour,
+                      value.minute,
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
 
     if (!mounted) return;
@@ -783,18 +776,9 @@ class _DateTimeSide extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall,
-        ),
-        TextButton(
-          onPressed: onDate,
-          child: Text(dateText),
-        ),
-        TextButton(
-          onPressed: onTime,
-          child: Text(timeText),
-        ),
+        Text(label, style: Theme.of(context).textTheme.labelSmall),
+        TextButton(onPressed: onDate, child: Text(dateText)),
+        TextButton(onPressed: onTime, child: Text(timeText)),
       ],
     );
   }
@@ -1008,40 +992,32 @@ class _EditorTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.all(3),
-      child: Material(
-        color: selected ? scheme.surfaceContainerHighest : Colors.transparent,
-        borderRadius: BorderRadius.circular(30),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(30),
-          onTap: onTap,
-          child: Center(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  size: 22,
-                  color: selected
-                      ? scheme.onSurface
-                      : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight:
-                        selected ? FontWeight.w700 : FontWeight.w500,
-                    color: selected
-                        ? scheme.onSurface
-                        : scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+    return InkWell(
+      borderRadius: BorderRadius.circular(30),
+      onTap: onTap,
+      child: Center(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 22,
+              color: selected
+                  ? scheme.onSurface
+                  : scheme.onSurfaceVariant,
             ),
-          ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? scheme.onSurface
+                    : scheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );
