@@ -8,6 +8,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../domain/event.dart';
+import 'alarm_alert.dart';
 import 'tts_service.dart';
 
 // Payload format: "eventId|slotIndex|minutesBefore|title|note"
@@ -48,9 +49,10 @@ class AlarmScheduler {
     final plugin = FlutterLocalNotificationsPlugin();
 
     void onResponse(NotificationResponse r) {
-      // TTS is scheduled natively with the alarm itself. Tapping the
-      // notification must not trigger a second announcement.
-      _handleResponse(tts, r);
+      // Full-screen notifications are reported through the same response
+      // callback. Show the dedicated acknowledgement screen without opening
+      // the planner.
+      AlarmAlertController.emitPayload(r.payload);
     }
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -68,6 +70,11 @@ class AlarmScheduler {
       onDidReceiveNotificationResponse: onResponse,
       onDidReceiveBackgroundNotificationResponse: _backgroundTap,
     );
+
+    final launchDetails = await plugin.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp ?? false) {
+      AlarmAlertController.emitPayload(launchDetails?.notificationResponse?.payload);
+    }
 
     await _configureAndroidChannels(plugin);
 
@@ -186,16 +193,9 @@ class AlarmScheduler {
     return false;
   }
 
-  static Future<void> _handleResponse(
-      TtsService tts, NotificationResponse r) async {
-    // Native Android TTS already speaks at the scheduled alarm time. Keep this
-    // callback silent so opening/tapping a notification never causes a second
-    // TTS announcement.
-  }
-
   @pragma('vm:entry-point')
   static void _backgroundTap(NotificationResponse r) {
-    // Native TTS is independent of the Flutter background isolate.
+    // Full-screen/tap handling is kept in the foreground activity callback.
   }
 
   Future<void> scheduleEvent(NextAEvent event) async {
@@ -246,9 +246,6 @@ class AlarmScheduler {
         payload: payload,
       );
 
-      // Schedule speech through the native Kotlin receiver at exactly the
-      // same instant as the notification. Flutter does not need to remain
-      // alive for this part.
       await _scheduleNativeTts(event, slot, minutesBefore, alarmTime);
     }
   }
@@ -271,7 +268,6 @@ class AlarmScheduler {
         'text': text,
       });
     } catch (e) {
-      // Notification alarms must still work if the native TTS bridge fails.
       debugPrint('NextA native TTS schedule failed: $e');
     }
   }
@@ -305,7 +301,6 @@ class AlarmScheduler {
       buffer.write(' ${event.note!.trim()}.');
     }
 
-    // Keep a very long note from turning one alarm into a long-running speech.
     final result = buffer.toString().trim();
     return result.length <= 320 ? result : '${result.substring(0, 317)}...';
   }
@@ -389,6 +384,8 @@ class AlarmScheduler {
         icon: '@mipmap/ic_launcher',
         category: AndroidNotificationCategory.alarm,
         audioAttributesUsage: AudioAttributesUsage.alarm,
+        fullScreenIntent: true,
+        visibility: NotificationVisibility.public,
       ),
       iOS: const DarwinNotificationDetails(
         presentAlert: true,
