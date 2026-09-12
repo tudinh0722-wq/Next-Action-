@@ -3,10 +3,12 @@ import 'dart:async';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 
+import 'application/alarm_alert.dart';
 import 'application/alarm_scheduler.dart';
 import 'application/tts_service.dart';
 import 'data/event_database.dart';
 import 'domain/event.dart';
+import 'presentation/alarm_screen.dart';
 import 'presentation/planner_screen.dart';
 
 Future<void> main() async {
@@ -63,6 +65,24 @@ class NextAApp extends StatefulWidget {
 class _NextAAppState extends State<NextAApp> {
   ThemeMode _themeMode = ThemeMode.system;
   Color _seedColor = const Color(0xFF1A73E8);
+  AlarmAlert? _activeAlarm;
+  StreamSubscription<AlarmAlert>? _alarmSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeAlarm = AlarmAlertController.pending;
+    _alarmSubscription = AlarmAlertController.stream.listen((alert) {
+      if (!mounted) return;
+      setState(() => _activeAlarm = alert);
+    });
+  }
+
+  @override
+  void dispose() {
+    _alarmSubscription?.cancel();
+    super.dispose();
+  }
 
   ThemeData _theme(ColorScheme scheme) => ThemeData(
         useMaterial3: true,
@@ -88,17 +108,22 @@ class _NextAAppState extends State<NextAApp> {
           theme: _theme(light),
           darkTheme: _theme(dark),
           themeMode: _themeMode,
-          home: PlannerScreen(
-            events: widget.initialEvents,
-            database: widget.database,
-            scheduler: widget.scheduler,
-            tts: widget.tts,
-            themeMode: _themeMode,
-            seedColor: _seedColor,
-            onThemeChanged: (mode) => setState(() => _themeMode = mode),
-            onSeedColorChanged: (color) =>
-                setState(() => _seedColor = color),
-          ),
+          home: _activeAlarm != null
+              ? AlarmScreen(
+                  alert: _activeAlarm!,
+                  scheduler: widget.scheduler,
+                )
+              : PlannerScreen(
+                  events: widget.initialEvents,
+                  database: widget.database,
+                  scheduler: widget.scheduler,
+                  tts: widget.tts,
+                  themeMode: _themeMode,
+                  seedColor: _seedColor,
+                  onThemeChanged: (mode) => setState(() => _themeMode = mode),
+                  onSeedColorChanged: (color) =>
+                      setState(() => _seedColor = color),
+                ),
         );
       },
     );
