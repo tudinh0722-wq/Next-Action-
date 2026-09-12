@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../application/bulk_import_service.dart';
 
@@ -18,6 +19,39 @@ class _AiImportSheetState extends State<AiImportSheet> {
   bool _importing = false;
   ImportSummary? _result;
 
+  static const _aiPrompt = '''Bạn là AI trích xuất dữ liệu lịch từ ảnh.
+
+Hãy đọc TẤT CẢ các sự kiện nhìn thấy trong ảnh (thời khóa biểu, lịch học, lịch làm việc, giấy ghi lịch, ảnh chụp màn hình lịch...) và chuyển chúng thành đúng định dạng bên dưới để tôi copy vào ứng dụng NextA.
+
+QUY TẮC:
+1. Đọc toàn bộ ảnh và tạo một bản ghi cho MỖI sự kiện.
+2. Không tự bịa hoặc suy đoán thông tin không có trong ảnh.
+3. Ngày phải chuẩn hóa thành YYYY-MM-DD.
+4. Giờ phải dùng định dạng 24 giờ HH:MM.
+5. Nếu ảnh có cả ngày bắt đầu và kết thúc, giữ đúng ngày/giờ đó.
+6. Nếu không thấy giờ kết thúc nhưng có giờ bắt đầu, để KẾT THÚC trống.
+7. Địa điểm và ghi chú giữ nội dung có ý nghĩa từ ảnh, bỏ ký tự thừa.
+8. ƯU TIÊN chỉ dùng 0, 1 hoặc 2. Nếu ảnh không thể hiện mức ưu tiên thì dùng 0.
+9. BÁO TRƯỚC là số phút. Nếu ảnh không thể hiện nhắc trước thì để trống.
+10. LẶP LẠI chỉ dùng: none, daily, weekly, weekdays, monthly. Nếu không lặp thì dùng none.
+11. LẶP LẠI_SỐ là số lần lặp nếu ảnh thể hiện; nếu không có thì để trống.
+12. Không thêm lời giải thích, không thêm Markdown, không dùng code block.
+13. Chỉ trả về dữ liệu theo đúng mẫu. Mỗi sự kiện cách nhau bằng một dòng trống.
+
+MẪU BẮT BUỘC:
+TÊN: <tên sự kiện>
+NGÀY: <YYYY-MM-DD>
+BẮT ĐẦU: <HH:MM>
+KẾT THÚC: <HH:MM>
+ĐỊA ĐIỂM: <địa điểm hoặc để trống>
+GHI CHÚ: <ghi chú hoặc để trống>
+ƯU TIÊN: <0|1|2>
+BÁO TRƯỚC: <số phút hoặc để trống>
+LẶP LẠI: <none|daily|weekly|weekdays|monthly>
+LẶP LẠI_SỐ: <số lần hoặc để trống>
+
+Nếu ảnh có nhiều sự kiện, hãy xuất tất cả theo đúng mẫu trên. Nếu một trường không đọc được chắc chắn, để trống thay vì tự đoán.''';
+
   @override
   void dispose() {
     _controller.dispose();
@@ -31,6 +65,33 @@ class _AiImportSheetState extends State<AiImportSheet> {
       _records = widget.service.parse(text);
       _result = null;
     });
+  }
+
+  Future<void> _showPrompt() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Prompt đọc lịch từ ảnh'),
+        content: SizedBox(
+          width: 620,
+          child: SingleChildScrollView(
+            child: SelectableText(_aiPrompt, style: const TextStyle(fontSize: 12.5, height: 1.35)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(const ClipboardData(text: _aiPrompt));
+              if (!dialogContext.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã copy prompt')));
+              Navigator.pop(dialogContext);
+            },
+            child: const Text('Copy prompt'),
+          ),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Đóng')),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirm() async {
@@ -86,10 +147,16 @@ class _AiImportSheetState extends State<AiImportSheet> {
           Text('Nhập nhiều sự kiện', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: scheme.onSurface)),
           const SizedBox(height: 6),
           Text(
-            'Mỗi sự kiện cách nhau bằng dòng trống. Các trường:\nTÊN · NGÀY · BẮT ĐẦU · KẾT THÚC · ĐỊA ĐIỂM · GHI CHÚ · ƯU TIÊN · BÁO TRƯỚC · LẶP LẠI · LẶP LẠI_SỐ',
+            'AI có thể đọc lịch từ ảnh rồi chuyển thành dữ liệu chuẩn để bạn copy vào đây.',
             style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _showPrompt,
+            icon: const Icon(Icons.auto_awesome_outlined),
+            label: const Text('Tạo prompt cho AI đọc ảnh'),
+          ),
+          const SizedBox(height: 10),
           Expanded(
             child: TextField(
               controller: _controller,
@@ -98,7 +165,7 @@ class _AiImportSheetState extends State<AiImportSheet> {
               textAlignVertical: TextAlignVertical.top,
               style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
               decoration: InputDecoration(
-                hintText: 'TÊN: Thiết kế phần mềm\nNGÀY: 2026-09-17\nBẮT ĐẦU: 09:30\nKẾT THÚC: 12:00\nĐỊA ĐIỂM: P1305-A1\n\nTÊN: Tiếng Anh CNTT\n...',
+                hintText: 'Dán kết quả AI vào đây...\n\nTÊN: Thiết kế phần mềm\nNGÀY: 2026-09-17\nBẮT ĐẦU: 09:30\nKẾT THÚC: 12:00\nĐỊA ĐIỂM: P1305-A1\n...',
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 contentPadding: const EdgeInsets.all(12),
               ),
