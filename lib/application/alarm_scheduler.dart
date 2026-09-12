@@ -22,11 +22,17 @@ class AlarmScheduler {
   final FlutterLocalNotificationsPlugin _plugin;
   final TtsService _tts;
 
-  static const _defaultChannelId = 'nexta_reminder_v3_default';
-  static const _highChannelId = 'nexta_reminder_v3_high';
-  static const _maxChannelId = 'nexta_reminder_v3_max';
+  // Use a new channel generation because Android persists the sound selected
+  // for a channel after its first creation. The explicit system alarm URI is
+  // important on Samsung/One UI: it avoids relying on the default notification
+  // sound while AudioAttributesUsage.alarm routes playback to Alarm volume.
+  static const _defaultChannelId = 'nexta_reminder_v4_default';
+  static const _highChannelId = 'nexta_reminder_v4_high';
+  static const _maxChannelId = 'nexta_reminder_v4_max';
   static const _channelName = 'NextA - Nhắc sự kiện';
   static const _channelDescription = 'Nhắc trước khi sự kiện bắt đầu';
+  static const AndroidNotificationSound _alarmSound =
+      UriAndroidNotificationSound('content://settings/system/alarm_alert');
 
   static AlarmScheduler? _instance;
   static bool _timezoneReady = false;
@@ -80,6 +86,7 @@ class AlarmScheduler {
         description: _channelDescription,
         importance: Importance.defaultImportance,
         playSound: true,
+        sound: _alarmSound,
         enableVibration: true,
         audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
@@ -91,6 +98,7 @@ class AlarmScheduler {
         description: _channelDescription,
         importance: Importance.high,
         playSound: true,
+        sound: _alarmSound,
         enableVibration: true,
         audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
@@ -102,6 +110,7 @@ class AlarmScheduler {
         description: _channelDescription,
         importance: Importance.max,
         playSound: true,
+        sound: _alarmSound,
         enableVibration: true,
         audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
@@ -335,6 +344,7 @@ class AlarmScheduler {
         importance: importance,
         priority: notifPriority,
         playSound: true,
+        sound: _alarmSound,
         enableVibration: true,
         icon: '@mipmap/ic_launcher',
         category: AndroidNotificationCategory.alarm,
