@@ -30,16 +30,8 @@ Future<EventEditorResult?> showEventEditor(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Chỉnh sửa sự kiện'),
-              onTap: () => Navigator.pop(c, 'edit'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Xóa sự kiện'),
-              onTap: () => Navigator.pop(c, 'delete'),
-            ),
+            ListTile(leading: const Icon(Icons.edit_outlined), title: const Text('Chỉnh sửa sự kiện'), onTap: () => Navigator.pop(c, 'edit')),
+            ListTile(leading: const Icon(Icons.delete_outline), title: const Text('Xóa sự kiện'), onTap: () => Navigator.pop(c, 'delete')),
             const SizedBox(height: 8),
           ],
         ),
@@ -60,9 +52,7 @@ Future<EventEditorResult?> showEventEditor(
           actions: [
             TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Hủy')),
             FilledButton(
-              style: event.recurrenceId != null
-                  ? FilledButton.styleFrom(backgroundColor: Theme.of(c).colorScheme.error, foregroundColor: Theme.of(c).colorScheme.onError)
-                  : null,
+              style: event.recurrenceId != null ? FilledButton.styleFrom(backgroundColor: Theme.of(c).colorScheme.error, foregroundColor: Theme.of(c).colorScheme.onError) : null,
               onPressed: () => Navigator.pop(c, true),
               child: const Text('Xóa'),
             ),
@@ -72,20 +62,15 @@ Future<EventEditorResult?> showEventEditor(
       return ok == true ? EventEditorResult(events: const [], deleted: true, scope: scope ?? RecurrenceScope.single) : null;
     }
     if (action != 'edit') return null;
-
-    final scope = event.recurrenceId == null
-        ? RecurrenceScope.single
-        : await _pickRecurrenceScope(context, title: 'Chỉnh sửa sự kiện lặp', destructive: false);
+    final scope = event.recurrenceId == null ? RecurrenceScope.single : await _pickRecurrenceScope(context, title: 'Chỉnh sửa sự kiện lặp', destructive: false);
     if (!context.mounted || scope == null) return null;
-
-    final result = await showModalBottomSheet<EventEditorResult>(
+    return showModalBottomSheet<EventEditorResult>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _EventEditorSheet(event: event, selectedDay: selectedDay, importService: importService, scope: scope),
     );
-    return result;
   }
 
   return showModalBottomSheet<EventEditorResult>(
@@ -97,42 +82,29 @@ Future<EventEditorResult?> showEventEditor(
   );
 }
 
-Future<RecurrenceScope?> _pickRecurrenceScope(
-  BuildContext context, {
-  required String title,
-  required bool destructive,
-}) {
-  return showDialog<RecurrenceScope>(
-    context: context,
-    builder: (_) => _RecurrenceScopeDialog(title: title, destructive: destructive),
-  );
+Future<RecurrenceScope?> _pickRecurrenceScope(BuildContext context, {required String title, required bool destructive}) {
+  return showDialog<RecurrenceScope>(context: context, builder: (_) => _RecurrenceScopeDialog(title: title, destructive: destructive));
 }
 
 class _RecurrenceScopeDialog extends StatefulWidget {
   const _RecurrenceScopeDialog({required this.title, required this.destructive});
   final String title;
   final bool destructive;
-
-  @override
-  State<_RecurrenceScopeDialog> createState() => _RecurrenceScopeDialogState();
+  @override State<_RecurrenceScopeDialog> createState() => _RecurrenceScopeDialogState();
 }
 
 class _RecurrenceScopeDialogState extends State<_RecurrenceScopeDialog> {
   RecurrenceScope _scope = RecurrenceScope.single;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return AlertDialog(
       title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.single, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Chỉ sự kiện này')),
-          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.future, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Sự kiện này và các sự kiện sau')),
-          RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.series, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Tất cả sự kiện trong chuỗi')),
-        ],
-      ),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.single, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Chỉ sự kiện này')),
+        RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.future, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Sự kiện này và các sự kiện sau')),
+        RadioListTile<RecurrenceScope>(dense: true, value: RecurrenceScope.series, groupValue: _scope, onChanged: (v) => setState(() => _scope = v!), title: const Text('Tất cả sự kiện trong chuỗi')),
+      ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
         FilledButton(
@@ -151,9 +123,7 @@ class _EventEditorSheet extends StatefulWidget {
   final DateTime selectedDay;
   final BulkImportService? importService;
   final RecurrenceScope? scope;
-
-  @override
-  State<_EventEditorSheet> createState() => _EventEditorSheetState();
+  @override State<_EventEditorSheet> createState() => _EventEditorSheetState();
 }
 
 class _EventEditorSheetState extends State<_EventEditorSheet> {
@@ -186,12 +156,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   }
 
   @override
-  void dispose() {
-    _title.dispose();
-    _location.dispose();
-    _note.dispose();
-    super.dispose();
-  }
+  void dispose() { _title.dispose(); _location.dispose(); _note.dispose(); super.dispose(); }
 
   Future<void> _pickDate(bool start) async {
     final current = start ? _start : _end;
@@ -199,12 +164,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
     if (date == null) return;
     setState(() {
       final value = DateTime(date.year, date.month, date.day, current.hour, current.minute);
-      if (start) {
-        _start = value;
-        if (!_end.isAfter(_start)) _end = _start.add(const Duration(hours: 1));
-      } else {
-        _end = value;
-      }
+      if (start) { _start = value; if (!_end.isAfter(_start)) _end = _start.add(const Duration(hours: 1)); } else { _end = value; }
     });
   }
 
@@ -218,46 +178,25 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       builder: (c) => SafeArea(
         child: SizedBox(
           height: 300,
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 4, 24, 4),
-                child: Row(
-                  children: [
-                    const Expanded(child: Text('Chọn thời gian', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-                    TextButton(onPressed: () => Navigator.pop(c), child: const Text('Xong')),
-                  ],
-                ),
-              ),
-              Expanded(child: CupertinoDatePicker(mode: CupertinoDatePickerMode.time, use24hFormat: false, initialDateTime: current, onDateTimeChanged: (v) => picked = DateTime(current.year, current.month, current.day, v.hour, v.minute))),
-            ],
-          ),
+          child: Column(children: [
+            Padding(padding: const EdgeInsets.fromLTRB(24, 4, 24, 4), child: Row(children: [const Expanded(child: Text('Chọn thời gian', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))), TextButton(onPressed: () => Navigator.pop(c), child: const Text('Xong'))])),
+            Expanded(child: CupertinoDatePicker(mode: CupertinoDatePickerMode.time, use24hFormat: false, initialDateTime: current, onDateTimeChanged: (v) => picked = DateTime(current.year, current.month, current.day, v.hour, v.minute))),
+          ]),
         ),
       ),
     );
     if (!mounted) return;
-    setState(() {
-      if (start) {
-        _start = picked;
-        if (!_end.isAfter(_start)) _end = _start.add(const Duration(hours: 1));
-      } else {
-        _end = picked;
-      }
-    });
+    setState(() { if (start) { _start = picked; if (!_end.isAfter(_start)) _end = _start.add(const Duration(hours: 1)); } else { _end = picked; } });
   }
 
   Future<void> _pickReminder() async {
     final result = await showDialog<_ReminderSettings>(context: context, builder: (_) => _ReminderDialog(minutes: _reminderMinutes, repeatCount: _reminderRepeatCount, interval: _reminderRepeatIntervalMinutes));
     if (result == null) return;
-    setState(() {
-      _reminderMinutes = result.enabled ? result.minutes : 0;
-      _reminderRepeatCount = result.enabled ? result.repeatCount : 0;
-      _reminderRepeatIntervalMinutes = result.enabled ? result.interval : 5;
-    });
+    setState(() { _reminderMinutes = result.enabled ? result.minutes : 0; _reminderRepeatCount = result.enabled ? result.repeatCount : 0; _reminderRepeatIntervalMinutes = result.enabled ? result.interval : 5; });
   }
 
   Future<void> _pickRecurrence() async {
-    final result = await showDialog<RecurrenceRule>(context: context, builder: (_) => _RecurrenceDialog(initial: _recurrenceRule, start: _start));
+    final result = await showDialog<RecurrenceRule>(context: context, builder: (_) => _RecurrenceDialog(initial: _recurrenceRule));
     if (result != null) setState(() => _recurrenceRule = result);
   }
 
@@ -297,41 +236,16 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
       child: SafeArea(
         top: true,
         bottom: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
-              child: showImportTab
-                  ? _EditorTabs(selectedBulk: _bulkImportTab, onChanged: (v) => setState(() => _bulkImportTab = v))
-                  : _SingleTabHeader(onClose: () => Navigator.pop(context)),
-            ),
-            Expanded(
-              child: _bulkImportTab && showImportTab
-                  ? AiImportSheet(service: widget.importService!, onImported: (_) {})
-                  : _EventContent(
-                      title: _title,
-                      location: _location,
-                      note: _note,
-                      start: _start,
-                      end: _end,
-                      priority: _priority,
-                      reminderMinutes: _reminderMinutes,
-                      reminderRepeatCount: _reminderRepeatCount,
-                      reminderRepeatIntervalMinutes: _reminderRepeatIntervalMinutes,
-                      recurrence: _recurrenceRule,
-                      onPriority: (p) => setState(() => _priority = p),
-                      onStartDate: () => _pickDate(true),
-                      onStartTime: () => _pickTime(true),
-                      onEndDate: () => _pickDate(false),
-                      onEndTime: () => _pickTime(false),
-                      onReminder: _pickReminder,
-                      onRecurrence: _pickRecurrence,
-                      onCancel: () => Navigator.pop(context),
-                      onSave: _save,
-                    ),
-            ),
-          ],
-        ),
+        child: Column(children: [
+          Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 14), child: showImportTab ? _EditorTabs(selectedBulk: _bulkImportTab, onChanged: (v) => setState(() => _bulkImportTab = v)) : _SingleTabHeader(onClose: () => Navigator.pop(context))),
+          Expanded(child: _bulkImportTab && showImportTab ? AiImportSheet(service: widget.importService!, onImported: (_) {}) : _EventContent(
+            title: _title, location: _location, note: _note, start: _start, end: _end, priority: _priority,
+            reminderMinutes: _reminderMinutes, reminderRepeatCount: _reminderRepeatCount, reminderRepeatIntervalMinutes: _reminderRepeatIntervalMinutes,
+            recurrence: _recurrenceRule, onPriority: (p) => setState(() => _priority = p), onStartDate: () => _pickDate(true), onStartTime: () => _pickTime(true),
+            onEndDate: () => _pickDate(false), onEndTime: () => _pickTime(false), onReminder: _pickReminder, onRecurrence: _pickRecurrence,
+            onCancel: () => Navigator.pop(context), onSave: _save,
+          )),
+        ]),
       ),
     );
   }
@@ -340,8 +254,7 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
 class _SingleTabHeader extends StatelessWidget {
   const _SingleTabHeader({required this.onClose});
   final VoidCallback onClose;
-  @override
-  Widget build(BuildContext context) => Row(children: [const Expanded(child: Text('Chỉnh sửa sự kiện', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded), visualDensity: VisualDensity.compact)]);
+  @override Widget build(BuildContext context) => Row(children: [const Expanded(child: Text('Chỉnh sửa sự kiện', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))), IconButton(onPressed: onClose, icon: const Icon(Icons.close_rounded), visualDensity: VisualDensity.compact)]);
 }
 
 class _EventContent extends StatelessWidget {
@@ -352,27 +265,34 @@ class _EventContent extends StatelessWidget {
   final RecurrenceRule recurrence;
   final ValueChanged<int> onPriority;
   final VoidCallback onStartDate, onStartTime, onEndDate, onEndTime, onReminder, onRecurrence, onCancel, onSave;
-  String _weekdayLabel(DateTime d) => const ['T.2', 'T.3', 'T.4', 'T.5', 'T.6', 'T.7', 'CN'][0] == '' ? '' : ['T.2', 'T.3', 'T.4', 'T.5', 'T.6', 'T.7', 'CN'][d.weekday - 1];
+
+  String _weekdayLabel(DateTime d) => const ['T.2', 'T.3', 'T.4', 'T.5', 'T.6', 'T.7', 'CN'][d.weekday - 1];
   String _date(DateTime d) => '${_weekdayLabel(d)}, ${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
   String _time(DateTime d) { final hour = d.hour % 12 == 0 ? 12 : d.hour % 12; return '$hour:${d.minute.toString().padLeft(2, '0')} ${d.hour >= 12 ? 'PM' : 'AM'}'; }
-  String _recurrenceLabel() => switch (recurrence.frequency) { RecurrenceFrequency.none => 'Không lặp lại', RecurrenceFrequency.daily => 'Hàng ngày', RecurrenceFrequency.weekly => 'Hàng tuần', RecurrenceFrequency.weekdays => 'Hàng tuần', RecurrenceFrequency.monthly => 'Hàng tháng' };
+  String _recurrenceLabel() => switch (recurrence.frequency) { RecurrenceFrequency.none => 'Không lặp lại', RecurrenceFrequency.daily => 'Hàng ngày', RecurrenceFrequency.weekly => 'Hàng tuần', RecurrenceFrequency.weekdays => 'Ngày trong tuần', RecurrenceFrequency.monthly => 'Hàng tháng' };
+
   @override
   Widget build(BuildContext context) {
     final reminderLabel = reminderMinutes > 0 ? '$reminderMinutes phút' : 'Tắt';
     final repeatLabel = reminderMinutes > 0 && reminderRepeatCount > 0 ? '$reminderRepeatCount lần • mỗi $reminderRepeatIntervalMinutes phút' : 'Không báo lại';
-    return Column(children: [Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.viewInsetsOf(context).bottom), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(crossAxisAlignment: CrossAxisAlignment.center, children: [Expanded(child: TextField(controller: title, autofocus: true, maxLength: 47, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Tên sự kiện', border: InputBorder.none, counterText: '', hintStyle: TextStyle(fontSize: 25), contentPadding: EdgeInsets.symmetric(vertical: 12))), const SizedBox(width: 8), _PrioritySelector(priority: priority, onSelected: onPriority)]),
-      const SizedBox(height: 10),
-      _DateTimeColumns(start: start, end: end, date: _date, time: _time, onStartDate: onStartDate, onStartTime: onStartTime, onEndDate: onEndDate, onEndTime: onEndTime),
-      const SizedBox(height: 18),
-      _EditorTextField(icon: Icons.location_on_outlined, controller: location, hintText: 'Địa chỉ', maxLength: 30, textInputAction: TextInputAction.next),
-      const SizedBox(height: 2),
-      _EditorTextField(icon: Icons.notes_outlined, controller: note, hintText: 'Ghi chú', maxLength: 30, minLines: 1, maxLines: 3, textInputAction: TextInputAction.newline),
-      const SizedBox(height: 14),
-      _EditorOptionTile(icon: Icons.notifications_none_rounded, title: 'Báo trước', subtitle: reminderLabel, onTap: onReminder),
-      _EditorOptionTile(icon: Icons.repeat_rounded, title: 'Lặp lại', subtitle: _recurrenceLabel(), onTap: onRecurrence),
-      _EditorOptionTile(icon: Icons.volume_up_outlined, title: 'Báo lại', subtitle: repeatLabel, onTap: onReminder),
-    ]))),
+    return Column(children: [
+      Expanded(child: SingleChildScrollView(padding: EdgeInsets.fromLTRB(24, 4, 24, 24 + MediaQuery.viewInsetsOf(context).bottom), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Expanded(child: TextField(controller: title, autofocus: true, maxLength: 47, textInputAction: TextInputAction.next, decoration: const InputDecoration(hintText: 'Tên sự kiện', border: InputBorder.none, counterText: '', hintStyle: TextStyle(fontSize: 25), contentPadding: EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(width: 8),
+          _PrioritySelector(priority: priority, onSelected: onPriority),
+        ]),
+        const SizedBox(height: 10),
+        _DateTimeColumns(start: start, end: end, date: _date, time: _time, onStartDate: onStartDate, onStartTime: onStartTime, onEndDate: onEndDate, onEndTime: onEndTime),
+        const SizedBox(height: 18),
+        _EditorTextField(icon: Icons.location_on_outlined, controller: location, hintText: 'Địa chỉ', maxLength: 30, textInputAction: TextInputAction.next),
+        const SizedBox(height: 2),
+        _EditorTextField(icon: Icons.notes_outlined, controller: note, hintText: 'Ghi chú', maxLength: 30, minLines: 1, maxLines: 3, textInputAction: TextInputAction.newline),
+        const SizedBox(height: 14),
+        _EditorOptionTile(icon: Icons.notifications_none_rounded, title: 'Báo trước', subtitle: reminderLabel, onTap: onReminder),
+        _EditorOptionTile(icon: Icons.repeat_rounded, title: 'Lặp lại', subtitle: _recurrenceLabel(), onTap: onRecurrence),
+        _EditorOptionTile(icon: Icons.volume_up_outlined, title: 'Báo lại', subtitle: repeatLabel, onTap: onReminder),
+      ]))),
       Padding(padding: const EdgeInsets.fromLTRB(24, 8, 24, 18), child: Material(color: Theme.of(context).colorScheme.surfaceContainerHigh, elevation: 7, shadowColor: Theme.of(context).colorScheme.shadow.withValues(alpha: .20), borderRadius: BorderRadius.circular(24), child: SizedBox(height: 60, child: Row(children: [Expanded(child: InkWell(onTap: onCancel, child: const Center(child: Text('Thoát', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700))))), Expanded(child: InkWell(onTap: onSave, child: const Center(child: Text('Lưu', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700))))])))),
     ]);
   }
@@ -385,8 +305,7 @@ class _EditorTextField extends StatelessWidget {
   final String hintText;
   final int? maxLength, minLines, maxLines;
   final TextInputAction? textInputAction;
-  @override
-  Widget build(BuildContext context) => Row(children: [SizedBox(width: 40, child: Center(child: Icon(icon, size: 22, color: Theme.of(context).colorScheme.onSurfaceVariant))), const SizedBox(width: 16), Expanded(child: TextField(controller: controller, maxLength: maxLength, minLines: minLines, maxLines: maxLines, textInputAction: textInputAction, decoration: InputDecoration(hintText: hintText, border: InputBorder.none, counterText: '', contentPadding: const EdgeInsets.symmetric(vertical: 8)))]);
+  @override Widget build(BuildContext context) => Row(children: [SizedBox(width: 40, child: Center(child: Icon(icon, size: 22, color: Theme.of(context).colorScheme.onSurfaceVariant))), const SizedBox(width: 16), Expanded(child: TextField(controller: controller, maxLength: maxLength, minLines: minLines, maxLines: maxLines, textInputAction: textInputAction, decoration: InputDecoration(hintText: hintText, border: InputBorder.none, counterText: '', contentPadding: const EdgeInsets.symmetric(vertical: 8))))]);
 }
 
 class _EditorOptionTile extends StatelessWidget {
@@ -394,16 +313,14 @@ class _EditorOptionTile extends StatelessWidget {
   final IconData icon;
   final String title, subtitle;
   final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: SizedBox(width: 40, child: Center(child: Icon(icon, size: 22))), title: Text(title), subtitle: Text(subtitle), onTap: onTap);
+  @override Widget build(BuildContext context) => ListTile(contentPadding: EdgeInsets.zero, leading: SizedBox(width: 40, child: Center(child: Icon(icon, size: 22))), title: Text(title), subtitle: Text(subtitle), onTap: onTap);
 }
 
 class _EditorTabs extends StatelessWidget {
   const _EditorTabs({required this.selectedBulk, required this.onChanged});
   final bool selectedBulk;
   final ValueChanged<bool> onChanged;
-  @override
-  Widget build(BuildContext context) => Material(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(34), child: SizedBox(height: 58, child: Row(children: [Expanded(child: _EditorTab(selected: !selectedBulk, label: 'Thêm sự kiện', icon: Icons.event_available_outlined, onTap: () => onChanged(false))), Expanded(child: _EditorTab(selected: selectedBulk, label: 'AI Import', icon: Icons.auto_awesome_outlined, onTap: () => onChanged(true)))]));
+  @override Widget build(BuildContext context) => Material(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(34), child: SizedBox(height: 58, child: Row(children: [Expanded(child: _EditorTab(selected: !selectedBulk, label: 'Thêm sự kiện', icon: Icons.event_available_outlined, onTap: () => onChanged(false))), Expanded(child: _EditorTab(selected: selectedBulk, label: 'AI Import', icon: Icons.auto_awesome_outlined, onTap: () => onChanged(true)))])));
 }
 
 class _EditorTab extends StatelessWidget {
@@ -412,19 +329,14 @@ class _EditorTab extends StatelessWidget {
   final String label;
   final IconData icon;
   final VoidCallback onTap;
-  @override
-  Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    return Padding(padding: const EdgeInsets.all(3), child: Material(color: selected ? s.surfaceContainerHighest : Colors.transparent, borderRadius: BorderRadius.circular(30), child: InkWell(borderRadius: BorderRadius.circular(30), onTap: onTap, child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 22, color: selected ? s.onSurface : s.onSurfaceVariant), const SizedBox(width: 8), Text(label, style: TextStyle(fontSize: 17, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? s.onSurface : s.onSurfaceVariant))]))));
-  }
+  @override Widget build(BuildContext context) { final s = Theme.of(context).colorScheme; return Padding(padding: const EdgeInsets.all(3), child: Material(color: selected ? s.surfaceContainerHighest : Colors.transparent, borderRadius: BorderRadius.circular(30), child: InkWell(borderRadius: BorderRadius.circular(30), onTap: onTap, child: Center(child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 22, color: selected ? s.onSurface : s.onSurfaceVariant), const SizedBox(width: 8), Text(label, style: TextStyle(fontSize: 17, fontWeight: selected ? FontWeight.w700 : FontWeight.w500, color: selected ? s.onSurface : s.onSurfaceVariant))])))); }
 }
 
 class _PrioritySelector extends StatelessWidget {
   const _PrioritySelector({required this.priority, required this.onSelected});
   final int priority;
   final ValueChanged<int> onSelected;
-  @override
-  Widget build(BuildContext context) => PopupMenuButton<int>(initialValue: priority, onSelected: onSelected, itemBuilder: (_) => const [PopupMenuItem(value: 0, child: Text('HIGH 1')), PopupMenuItem(value: 1, child: Text('HIGH 2')), PopupMenuItem(value: 2, child: Text('HIGH 3'))], child: Icon(Icons.flag_outlined, color: priorityColor(priority)));
+  @override Widget build(BuildContext context) => PopupMenuButton<int>(initialValue: priority, onSelected: onSelected, itemBuilder: (_) => const [PopupMenuItem(value: 0, child: Text('HIGH 1')), PopupMenuItem(value: 1, child: Text('HIGH 2')), PopupMenuItem(value: 2, child: Text('HIGH 3'))], child: Icon(Icons.flag_outlined, color: nextAPriorityColor(priority)));
 }
 
 class _DateTimeColumns extends StatelessWidget {
@@ -432,8 +344,7 @@ class _DateTimeColumns extends StatelessWidget {
   final DateTime start, end;
   final String Function(DateTime) date, time;
   final VoidCallback onStartDate, onStartTime, onEndDate, onEndTime;
-  @override
-  Widget build(BuildContext context) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('BẮT ĐẦU', style: Theme.of(context).textTheme.labelSmall), TextButton(onPressed: onStartDate, child: Text(date(start))), TextButton(onPressed: onStartTime, child: Text(time(start)))])), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('KẾT THÚC', style: Theme.of(context).textTheme.labelSmall), TextButton(onPressed: onEndDate, child: Text(date(end))), TextButton(onPressed: onEndTime, child: Text(time(end)))]));
+  @override Widget build(BuildContext context) => Row(children: [Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('BẮT ĐẦU', style: Theme.of(context).textTheme.labelSmall), TextButton(onPressed: onStartDate, child: Text(date(start))), TextButton(onPressed: onStartTime, child: Text(time(start)))])), const SizedBox(width: 12), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('KẾT THÚC', style: Theme.of(context).textTheme.labelSmall), TextButton(onPressed: onEndDate, child: Text(date(end))), TextButton(onPressed: onEndTime, child: Text(time(end)))]))]);
 }
 
 class _ReminderSettings {
@@ -451,17 +362,16 @@ class _ReminderDialogState extends State<_ReminderDialog> {
   late bool enabled;
   late int minutes, repeatCount, interval;
   @override void initState() { super.initState(); enabled = widget.minutes > 0; minutes = widget.minutes > 0 ? widget.minutes : 10; repeatCount = widget.repeatCount > 0 ? widget.repeatCount : 2; interval = widget.interval > 0 ? widget.interval : 5; }
-  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Báo trước'), content: Column(mainAxisSize: MainAxisSize.min, children: [SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Bật nhắc nhở'), value: enabled, onChanged: (v) => setState(() => enabled = v)), if (enabled) ...[DropdownButtonFormField<int>(value: minutes, decoration: const InputDecoration(labelText: 'Báo trước'), items: const [5, 10, 15, 30, 60].map((v) => DropdownMenuItem(value: v, child: Text('$v phút'))).toList(), onChanged: (v) => setState(() => minutes = v ?? minutes)), DropdownButtonFormField<int>(value: repeatCount, decoration: const InputDecoration(labelText: 'Số lần báo lại'), items: const [1, 2, 3, 5].map((v) => DropdownMenuItem(value: v, child: Text('$v lần'))).toList(), onChanged: (v) => setState(() => repeatCount = v ?? repeatCount)), DropdownButtonFormField<int>(value: interval, decoration: const InputDecoration(labelText: 'Khoảng cách'), items: const [1, 5, 10, 15].map((v) => DropdownMenuItem(value: v, child: Text('$v phút'))).toList(), onChanged: (v) => setState(() => interval = v ?? interval))]]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')), FilledButton(onPressed: () => Navigator.pop(context, _ReminderSettings(enabled: enabled, minutes: minutes, repeatCount: repeatCount, interval: interval)), child: const Text('Xong'))]);
+  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Báo trước'), content: Column(mainAxisSize: MainAxisSize.min, children: [SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Bật nhắc nhở'), value: enabled, onChanged: (v) => setState(() => enabled = v)), if (enabled) ...[DropdownButtonFormField<int>(initialValue: minutes, decoration: const InputDecoration(labelText: 'Báo trước'), items: const [5, 10, 15, 30, 60].map((v) => DropdownMenuItem(value: v, child: Text('$v phút'))).toList(), onChanged: (v) => setState(() => minutes = v ?? minutes)), DropdownButtonFormField<int>(initialValue: repeatCount, decoration: const InputDecoration(labelText: 'Số lần báo lại'), items: const [1, 2, 3, 5].map((v) => DropdownMenuItem(value: v, child: Text('$v lần'))).toList(), onChanged: (v) => setState(() => repeatCount = v ?? repeatCount)), DropdownButtonFormField<int>(initialValue: interval, decoration: const InputDecoration(labelText: 'Khoảng cách'), items: const [1, 5, 10, 15].map((v) => DropdownMenuItem(value: v, child: Text('$v phút'))).toList(), onChanged: (v) => setState(() => interval = v ?? interval))]], actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')), FilledButton(onPressed: () => Navigator.pop(context, _ReminderSettings(enabled: enabled, minutes: minutes, repeatCount: repeatCount, interval: interval)), child: const Text('Xong'))]);
 }
 
 class _RecurrenceDialog extends StatefulWidget {
-  const _RecurrenceDialog({required this.initial, required this.start});
+  const _RecurrenceDialog({required this.initial});
   final RecurrenceRule initial;
-  final DateTime start;
   @override State<_RecurrenceDialog> createState() => _RecurrenceDialogState();
 }
 class _RecurrenceDialogState extends State<_RecurrenceDialog> {
   late RecurrenceRule rule;
   @override void initState() { super.initState(); rule = widget.initial; }
-  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Lặp lại'), content: DropdownButtonFormField<RecurrenceFrequency>(value: rule.frequency, items: const [DropdownMenuItem(value: RecurrenceFrequency.none, child: Text('Không lặp lại')), DropdownMenuItem(value: RecurrenceFrequency.daily, child: Text('Hàng ngày')), DropdownMenuItem(value: RecurrenceFrequency.weekly, child: Text('Hàng tuần')), DropdownMenuItem(value: RecurrenceFrequency.weekdays, child: Text('Ngày trong tuần')), DropdownMenuItem(value: RecurrenceFrequency.monthly, child: Text('Hàng tháng'))], onChanged: (v) { if (v != null) setState(() => rule = RecurrenceRule(frequency: v, count: rule.count, until: rule.until)); }), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')), FilledButton(onPressed: () => Navigator.pop(context, rule), child: const Text('Xong'))]);
+  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Lặp lại'), content: DropdownButtonFormField<RecurrenceFrequency>(initialValue: rule.frequency, items: const [DropdownMenuItem(value: RecurrenceFrequency.none, child: Text('Không lặp lại')), DropdownMenuItem(value: RecurrenceFrequency.daily, child: Text('Hàng ngày')), DropdownMenuItem(value: RecurrenceFrequency.weekly, child: Text('Hàng tuần')), DropdownMenuItem(value: RecurrenceFrequency.weekdays, child: Text('Ngày trong tuần')), DropdownMenuItem(value: RecurrenceFrequency.monthly, child: Text('Hàng tháng'))], onChanged: (v) { if (v != null) setState(() => rule = RecurrenceRule(frequency: v, count: rule.count, until: rule.until)); }), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')), FilledButton(onPressed: () => Navigator.pop(context, rule), child: const Text('Xong'))]);
 }
