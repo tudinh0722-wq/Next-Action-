@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'application/alarm_scheduler.dart';
@@ -17,24 +16,17 @@ Future<void> main() async {
   final scheduler = await AlarmScheduler.init(tts);
 
   final database = await EventDatabase.open();
+
+  // Remove the old development-only alarm from databases created by previous
+  // builds. NextA no longer creates a test event automatically.
+  const debugAlarmId = '__nexta_debug_alarm_test__';
+  await scheduler.cancelEvent(debugAlarmId);
+  await database.delete(debugAlarmId);
+
   var events = await database.getAll();
   if (events.isEmpty) {
     events = _buildDemoEvents();
     await database.replaceAll(events);
-  }
-
-  // Debug builds get one deterministic alarm test event only once.
-  // Do not recreate it on every app launch: doing so would move the event
-  // forward by 5 minutes every time the app is opened and reschedule its alarm.
-  // Delete the test event manually if a fresh debug alarm run is needed.
-  if (kDebugMode) {
-    final hasDebugAlarm =
-        events.any((event) => event.id == '__nexta_debug_alarm_test__');
-    if (!hasDebugAlarm) {
-      final testEvent = _buildDebugAlarmTestEvent();
-      await database.upsert(testEvent);
-      events = await database.getAll();
-    }
   }
 
   runApp(NextAApp(
@@ -48,26 +40,6 @@ Future<void> main() async {
   // screen cannot block the first Flutter frame. The scheduler still restores
   // all future alarms on every app launch.
   unawaited(scheduler.scheduleAll(events));
-}
-
-NextAEvent _buildDebugAlarmTestEvent() {
-  final start = DateTime.now()
-      .add(const Duration(minutes: 5))
-      .copyWith(second: 0, millisecond: 0, microsecond: 0);
-
-  return NextAEvent(
-    id: '__nexta_debug_alarm_test__',
-    title: 'TEST BÁO THỨC · 5 phút',
-    type: EventType.other,
-    start: start,
-    end: start.add(const Duration(minutes: 1)),
-    location: 'NextA alarm test',
-    note: 'Báo trước 4 phút · lặp 2 lần · cách nhau 1 phút',
-    priority: 2,
-    reminderMinutes: 4,
-    reminderRepeatCount: 2,
-    reminderRepeatIntervalMinutes: 1,
-  );
 }
 
 class NextAApp extends StatefulWidget {
