@@ -16,10 +16,12 @@ import 'tts_service.dart';
 /// Schedules local notification alarms and native Android TTS alarms for
 /// [NextAEvent].
 ///
-/// Android uses exact, while-idle scheduling. The notification is handled by
-/// flutter_local_notifications, while speech is scheduled through a small
-/// native Kotlin receiver so it can run when Flutter is in the background or
-/// not running at all.
+/// NextA exposes three product-level reminder severities: HIGH 1, HIGH 2 and
+/// HIGH 3. They intentionally share the same Android full-screen alarm
+/// workflow so users do not have to choose MAX just to get the proper alarm
+/// acknowledgement screen. The severity remains available to the UI and
+/// future sound/vibration tuning, while Android handles the delivery through
+/// one reliable full-screen alarm channel.
 class AlarmScheduler {
   AlarmScheduler._(this._plugin, this._tts);
 
@@ -367,29 +369,17 @@ class AlarmScheduler {
   }
 
   NotificationDetails _details(int priority) {
-    final channelId = priority >= 2
-        ? _maxChannelId
-        : priority == 1
-            ? _highChannelId
-            : _defaultChannelId;
-    final importance = priority >= 2
-        ? Importance.max
-        : priority == 1
-            ? Importance.high
-            : Importance.defaultImportance;
-    final notifPriority = priority >= 2
-        ? Priority.max
-        : priority == 1
-            ? Priority.high
-            : Priority.defaultPriority;
-
-    return NotificationDetails(
+    // NextA priority is intentionally NOT mapped to Android DEFAULT/HIGH/MAX.
+    // All three product levels must enter the same full-screen alarm workflow.
+    // Keep the Android channel at MAX because this is the configuration proven
+    // to wake the locked screen on the target Samsung device.
+    return const NotificationDetails(
       android: AndroidNotificationDetails(
-        channelId,
+        _maxChannelId,
         _channelName,
         channelDescription: _channelDescription,
-        importance: importance,
-        priority: notifPriority,
+        importance: Importance.max,
+        priority: Priority.max,
         playSound: true,
         sound: _alarmSound,
         enableVibration: true,
@@ -399,7 +389,7 @@ class AlarmScheduler {
         fullScreenIntent: true,
         visibility: NotificationVisibility.public,
       ),
-      iOS: const DarwinNotificationDetails(
+      iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentSound: true,
         presentBadge: false,
