@@ -92,7 +92,7 @@ class AlarmScreen extends StatelessWidget {
                   child: FloatingActionButton.extended(
                     onPressed: () => _acknowledge(context),
                     icon: const Icon(Icons.check_rounded),
-                    label: const Text('ĐÃ BIẾT'),
+                    label: const Text('XÁC NHẬN'),
                     elevation: 6,
                     extendedPadding: const EdgeInsets.symmetric(horizontal: 30),
                   ),
