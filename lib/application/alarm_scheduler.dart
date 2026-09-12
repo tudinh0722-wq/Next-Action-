@@ -153,13 +153,19 @@ class AlarmScheduler {
         await androidImpl.canScheduleExactNotifications() ?? false;
     if (granted) return true;
 
-    if (!_exactAlarmPermissionPrompted) {
-      _exactAlarmPermissionPrompted = true;
-      try {
-        await androidImpl.requestExactAlarmsPermission();
-      } catch (e) {
-        debugPrint('NextA exact alarm permission request failed: $e');
-      }
+    // Ask only once per app process. If the user does not grant it, do not
+    // block startup or every subsequent event for another 45 seconds.
+    if (_exactAlarmPermissionPrompted) {
+      debugPrint('NextA exact alarm permission is still not granted.');
+      return false;
+    }
+
+    _exactAlarmPermissionPrompted = true;
+    try {
+      await androidImpl.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint('NextA exact alarm permission request failed: $e');
+      return false;
     }
 
     // Give the user time to return from the system permission screen. This is
