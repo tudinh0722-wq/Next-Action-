@@ -12,7 +12,15 @@
 - Added finite recurrence generation and recurrence metadata.
 - Added recurrence unit tests covering daily/weekly/monthly behavior and finite limits.
 
+## Milestone 1 — Android reminder stabilization
+- Added dedicated v3 Android reminder channels for default/high/max priority levels.
+- Configured reminder channels to use the Android alarm audio stream, system sound and vibration.
+- Kept exact, while-idle scheduling for reminder delivery.
+- Switched exact-alarm permission handling to `requestExactAlarmsPermission()` and moved it out of blocking startup initialization.
+- Restored correctly encoded Vietnamese notification text.
+- Preserved scheduled-notification boot restoration.
+- Added a deterministic debug alarm event: 5-minute countdown, first reminder at 4 minutes before, then two repeats one minute apart.
+
 ## Current platform work
-- Added Flutter Android alarm scheduling with device-timezone-aware `zonedSchedule` and exact-alarm support.
-- Android reminder sound is intended to use the system notification/alarm sound; channel configuration must be treated as persistent Android state.
+- Android reminder stabilization is implemented and requires real-device validation, especially locked-screen/background delivery and Samsung sound/volume behavior.
 - Home Widget and Focus/Lock Screen remain separate platform surfaces rather than being coupled to planner UI.
