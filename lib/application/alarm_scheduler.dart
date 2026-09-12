@@ -150,6 +150,18 @@ class AlarmScheduler {
 
     await androidImpl.requestNotificationsPermission();
 
+    // Android 14+ can keep USE_FULL_SCREEN_INTENT disabled even when it is
+    // declared in AndroidManifest. Without this permission a full-screen
+    // alarm falls back to a heads-up notification, which is exactly the
+    // symptom where the user must tap the notification to reach AlarmScreen.
+    try {
+      final fullScreenGranted =
+          await androidImpl.requestFullScreenIntentPermission() ?? false;
+      debugPrint('NextA full-screen alarm permission: $fullScreenGranted');
+    } catch (e) {
+      debugPrint('NextA full-screen alarm permission request failed: $e');
+    }
+
     final hasExact =
         await androidImpl.canScheduleExactNotifications() ?? false;
     if (!hasExact) {
