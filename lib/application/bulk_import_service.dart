@@ -14,16 +14,9 @@ class ImportRecord {
     required this.errors,
   });
 
-  /// Raw text block that produced this record.
   final String raw;
-
-  /// 0-based position in the source text.
   final int index;
-
-  /// Non-null when validation passed.
   final NextAEvent? event;
-
-  /// Human-readable validation errors; empty when valid.
   final List<String> errors;
 
   bool get isValid => errors.isEmpty && event != null;
@@ -37,18 +30,9 @@ class ImportSummary {
 }
 
 // ── Parser contract ───────────────────────────────────────────────────────────
-// Format (each record separated by blank line or "---"):
-//
-//   TÊN: Thiết kế phần mềm
-//   NGÀY: 2026-09-17            (or DD/MM/YYYY)
-//   BẮT ĐẦU: 09:30             (HH:mm, 12h with AM/PM also accepted)
-//   KẾT THÚC: 12:00
-//   ĐỊA ĐIỂM: P1305-A1         (optional)
-//   GHI CHÚ: Thực hành         (optional)
-//   ƯU TIÊN: 1                  (0 low, 1 medium, 2 high — optional)
-//   BÁO TRƯỚC: 10              (minutes — optional, default 10)
-//   LẶP LẠI: weekly / daily / weekdays / monthly / none  (optional)
-//   LẶP LẠI_SỐ: 10            (count — optional, default 10)
+// Each record is separated by a blank line or an explicit "---" line.
+// Required: TÊN, NGÀY, BẮT ĐẦU, KẾT THÚC.
+// Optional: ĐỊA ĐIỂM, GHI CHÚ, ƯU TIÊN, BÁO TRƯỚC, LẶP LẠI, LẶP LẠI_SỐ.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class BulkImportService {
@@ -60,35 +44,24 @@ class BulkImportService {
   final EventDatabase database;
   final AlarmScheduler scheduler;
 
-  // ── Parse ─────────────────────────────────────────────────────────────────
-
-  /// Parses [text] into a list of [ImportRecord]s without touching the DB.
   List<ImportRecord> parse(String text) {
     final blocks = _splitBlocks(text);
-    final records = <ImportRecord>[];
-    for (var i = 0; i < blocks.length; i++) {
-      records.add(_parseBlock(blocks[i], i));
-    }
-    return records;
+    return [
+      for (var i = 0; i < blocks.length; i++) _parseBlock(blocks[i], i),
+    ];
   }
 
-  // ── Persist ───────────────────────────────────────────────────────────────
-
-  /// Persists only the valid records from [records] and schedules their
-  /// reminders. Returns a summary.
   Future<ImportSummary> confirm(List<ImportRecord> records) async {
     final valid = records.where((r) => r.isValid).toList();
-    int imported = 0;
+    var imported = 0;
 
     for (final record in valid) {
       final event = record.event!;
       final rule = event.recurrenceRule;
-      List<NextAEvent> toInsert;
-      if (rule != null && rule.frequency != RecurrenceFrequency.none) {
-        toInsert = generateOccurrences(event, rule: rule);
-      } else {
-        toInsert = [event];
-      }
+      final toInsert = rule != null && rule.frequency != RecurrenceFrequency.none
+          ? generateOccurrences(event, rule: rule)
+          : <NextAEvent>[event];
+
       await database.upsertAll(toInsert);
       for (final e in toInsert) {
         await scheduler.scheduleEvent(e);
@@ -102,17 +75,13 @@ class BulkImportService {
     );
   }
 
-  // ── Internal helpers ──────────────────────────────────────────────────────
-
   List<String> _splitBlocks(String text) {
-    // Split on blank lines or explicit "---" separators.
     final raw = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    final blocks = raw
-        .split(RegExp(r'\n\s*\n|\n---+\n'))
+    return raw
+        .split(RegExp(r'\n\s*\n|\n---+\s*(?:\n|$)'))
         .map((b) => b.trim())
         .where((b) => b.isNotEmpty)
         .toList();
-    return blocks;
   }
 
   ImportRecord _parseBlock(String block, int index) {
@@ -122,121 +91,95 @@ class BulkImportService {
       if (colon < 0) continue;
       final key = line.substring(0, colon).trim().toUpperCase();
       final value = line.substring(colon + 1).trim();
-      if (key.isNotEmpty && value.isNotEmpty) {
-        fields[key] = value;
-      }
+      if (key.isNotEmpty) fields[key] = value;
     }
 
     final errors = <String>[];
 
-    // Title
     final title = fields['TÊN'] ?? fields['TEN'] ?? '';
     if (title.isEmpty) errors.add('Thiếu tên sự kiện (TÊN:)');
 
-    // Date
     final dateStr = fields['NGÀY'] ?? fields['NGAY'] ?? '';
-    DateTime? date = _parseDate(dateStr);
+    final date = _parseDate(dateStr);
     if (date == null) {
-      errors.add('Thiếu hoặc sai định dạng ngày (NGÀY: YYYY-MM-DD hoặc DD/MM/YYYY)');
+      errors.add('Thiếu hoặc sai ngày (YYYY-MM-DD hoặc DD/MM/YYYY)');
     }
 
-    // Start time
     final startStr = fields['BẮT ĐẦU'] ?? fields['BAT DAU'] ?? fields['BẮT_ĐẦU'] ?? '';
     final startTime = _parseTime(startStr);
-    if (startTime == null) {
-      errors.add('Thiếu hoặc sai giờ bắt đầu (BẮT ĐẦU: HH:mm)');
-    }
+    if (startTime == null) errors.add('Thiếu hoặc sai giờ bắt đầu (HH:mm)');
 
-    // End time
     final endStr = fields['KẾT THÚC'] ?? fields['KET THUC'] ?? fields['KẾT_THÚC'] ?? '';
     final endTime = _parseTime(endStr);
-    if (endTime == null) {
-      errors.add('Thiếu hoặc sai giờ kết thúc (KẾT THÚC: HH:mm)');
-    }
+    if (endTime == null) errors.add('Thiếu hoặc sai giờ kết thúc (HH:mm)');
 
     if (errors.isNotEmpty) {
       return ImportRecord._(raw: block, index: index, errors: errors);
     }
 
     final startDt = DateTime(
-        date!.year, date.month, date.day, startTime!.$1, startTime.$2);
-    final endDt =
-        DateTime(date.year, date.month, date.day, endTime!.$1, endTime.$2);
+      date!.year,
+      date.month,
+      date.day,
+      startTime!.$1,
+      startTime.$2,
+    );
+    final endDt = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      endTime!.$1,
+      endTime.$2,
+    );
+    if (!endDt.isAfter(startDt)) errors.add('Giờ kết thúc phải sau giờ bắt đầu');
 
-    if (!endDt.isAfter(startDt)) {
-      errors.add('Giờ kết thúc phải sau giờ bắt đầu');
+    final location = _optional(fields, ['ĐỊA ĐIỂM', 'DIA DIEM', 'ĐỊA_ĐIỂM']);
+    final note = _optional(fields, ['GHI CHÚ', 'GHI_CHÚ', 'GHI CHU']);
+
+    final priorityRaw = _optional(fields, ['ƯU TIÊN', 'UU TIEN']);
+    final priority = priorityRaw == null ? 0 : int.tryParse(priorityRaw);
+    if (priority == null || priority < 0 || priority > 2) {
+      if (priorityRaw != null) errors.add('Ưu tiên phải là 0, 1 hoặc 2');
+    }
+
+    final reminderRaw = _optional(fields, ['BÁO TRƯỚC', 'BAO TRUOC']);
+    final reminderMinutes = reminderRaw == null ? 10 : int.tryParse(reminderRaw);
+    if (reminderMinutes == null || reminderMinutes < 0 || reminderMinutes > 10080) {
+      if (reminderRaw != null) errors.add('Báo trước phải là số từ 0–10080 phút');
+    }
+
+    final recurrenceRaw = _optional(fields, ['LẶP LẠI', 'LAP LAI']) ?? 'none';
+    final frequency = _parseFrequency(recurrenceRaw);
+    if (frequency == null) {
+      errors.add('Lặp lại không hợp lệ: $recurrenceRaw');
+    }
+
+    final recurrenceCountRaw = _optional(fields, ['LẶP LẠI_SỐ', 'LAP LAI SO']);
+    final recurrenceCount = recurrenceCountRaw == null
+        ? 10
+        : int.tryParse(recurrenceCountRaw);
+    if (recurrenceCount == null || recurrenceCount < 1 || recurrenceCount > 366) {
+      if (recurrenceCountRaw != null || frequency != RecurrenceFrequency.none) {
+        errors.add('Số lần lặp lại phải là số từ 1–366');
+      }
     }
 
     if (errors.isNotEmpty) {
-      return ImportRecord._(raw: block, index: index, errors: errors);
-    }
-
-    // Optional fields
-    final locationRaw = fields['ĐỊA ĐIỂM'] ?? fields['DIA DIEM'] ?? fields['ĐỊA_ĐIỂM'];
-    final location = (locationRaw?.isEmpty ?? true) ? null : locationRaw;
-    final noteRaw = fields['GHI CHÚ'] ?? fields['GHI_CHÚ'] ?? fields['GHI CHU'];
-    final note = (noteRaw?.isEmpty ?? true) ? null : noteRaw;
-    final priority = int.tryParse(fields['ƯU TIÊN'] ?? fields['UU TIEN'] ?? '') ?? 0;
-    final reminderMinutes =
-        int.tryParse(fields['BÁO TRƯỚC'] ?? fields['BAO TRUOC'] ?? '') ?? 10;
-
-    // Validate priority
-    if (priority < 0 || priority > 2) {
-      errors.add('Ưu tiên phải là 0, 1 hoặc 2');
-    }
-    if (reminderMinutes < 0 || reminderMinutes > 10080) {
-      errors.add('Báo trước phải trong khoảng 0–10080 phút');
-    }
-    if (errors.isNotEmpty) {
-      return ImportRecord._(raw: block, index: index, errors: errors);
-    }
-
-    // Recurrence
-    final recurrenceStr =
-        (fields['LẶP LẠI'] ?? fields['LAP LAI'] ?? 'none').toLowerCase().trim();
-    RecurrenceFrequency frequency;
-    switch (recurrenceStr) {
-      case 'daily':
-      case 'hàng ngày':
-      case 'hang ngay':
-        frequency = RecurrenceFrequency.daily;
-        break;
-      case 'weekly':
-      case 'hàng tuần':
-      case 'hang tuan':
-        frequency = RecurrenceFrequency.weekly;
-        break;
-      case 'weekdays':
-      case 'ngày trong tuần':
-        frequency = RecurrenceFrequency.weekdays;
-        break;
-      case 'monthly':
-      case 'hàng tháng':
-      case 'hang thang':
-        frequency = RecurrenceFrequency.monthly;
-        break;
-      default:
-        frequency = RecurrenceFrequency.none;
-    }
-
-    final recurrenceCount =
-        int.tryParse(fields['LẶP LẠI_SỐ'] ?? fields['LAP LAI SO'] ?? '') ?? 10;
-    if (frequency != RecurrenceFrequency.none &&
-        (recurrenceCount < 1 || recurrenceCount > 366)) {
-      errors.add('Số lần lặp lại phải trong khoảng 1–366');
       return ImportRecord._(raw: block, index: index, errors: errors);
     }
 
     RecurrenceRule? rule;
     if (frequency != RecurrenceFrequency.none) {
       rule = RecurrenceRule(
-        frequency: frequency,
+        frequency: frequency!,
         endMode: RecurrenceEndMode.count,
-        count: recurrenceCount,
+        count: recurrenceCount!,
       );
     }
 
-    final id = '${startDt.millisecondsSinceEpoch}_${title.hashCode.abs()}';
+    // Stable across app launches: importing the same record again replaces the
+    // same row instead of creating a duplicate.
+    final id = 'import_${startDt.millisecondsSinceEpoch}_${_stableHash(title)}';
     final event = NextAEvent(
       id: id,
       title: title,
@@ -245,10 +188,10 @@ class BulkImportService {
       end: endDt,
       location: location,
       note: note,
-      priority: priority.clamp(0, 2).toInt(),
-      recurrenceId: rule != null ? id : null,
+      priority: priority ?? 0,
+      recurrenceId: rule == null ? null : id,
       recurrenceRule: rule,
-      reminderMinutes: reminderMinutes,
+      reminderMinutes: reminderMinutes ?? 10,
       reminderRepeatCount: 2,
       reminderRepeatIntervalMinutes: 5,
     );
@@ -256,40 +199,93 @@ class BulkImportService {
     return ImportRecord._(raw: block, index: index, event: event, errors: const []);
   }
 
-  DateTime? _parseDate(String s) {
-    if (s.isEmpty) return null;
-    // ISO: 2026-09-17
-    final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(s);
-    if (iso != null) {
-      final y = int.parse(iso.group(1)!);
-      final m = int.parse(iso.group(2)!);
-      final d = int.parse(iso.group(3)!);
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return DateTime(y, m, d);
-    }
-    // DD/MM/YYYY or D/M/YYYY
-    final dmy = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(s);
-    if (dmy != null) {
-      final d = int.parse(dmy.group(1)!);
-      final m = int.parse(dmy.group(2)!);
-      final y = int.parse(dmy.group(3)!);
-      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return DateTime(y, m, d);
+  String? _optional(Map<String, String> fields, List<String> keys) {
+    for (final key in keys) {
+      final value = fields[key];
+      if (value != null && value.isNotEmpty) return value;
     }
     return null;
   }
 
-  /// Returns (hour, minute) or null.
+  RecurrenceFrequency? _parseFrequency(String value) {
+    switch (value.toLowerCase().trim()) {
+      case 'none':
+      case 'không':
+      case 'khong':
+        return RecurrenceFrequency.none;
+      case 'daily':
+      case 'hàng ngày':
+      case 'hang ngay':
+        return RecurrenceFrequency.daily;
+      case 'weekly':
+      case 'hàng tuần':
+      case 'hang tuan':
+        return RecurrenceFrequency.weekly;
+      case 'weekdays':
+      case 'ngày trong tuần':
+      case 'ngay trong tuan':
+        return RecurrenceFrequency.weekdays;
+      case 'monthly':
+      case 'hàng tháng':
+      case 'hang thang':
+        return RecurrenceFrequency.monthly;
+      default:
+        return null;
+    }
+  }
+
+  DateTime? _parseDate(String s) {
+    if (s.isEmpty) return null;
+    final iso = RegExp(r'^(\d{4})-(\d{1,2})-(\d{1,2})$').firstMatch(s);
+    if (iso != null) {
+      return _validDate(
+        int.parse(iso.group(1)!),
+        int.parse(iso.group(2)!),
+        int.parse(iso.group(3)!),
+      );
+    }
+    final dmy = RegExp(r'^(\d{1,2})/(\d{1,2})/(\d{4})$').firstMatch(s);
+    if (dmy != null) {
+      return _validDate(
+        int.parse(dmy.group(3)!),
+        int.parse(dmy.group(2)!),
+        int.parse(dmy.group(1)!),
+      );
+    }
+    return null;
+  }
+
+  DateTime? _validDate(int year, int month, int day) {
+    if (month < 1 || month > 12 || day < 1) return null;
+    final candidate = DateTime(year, month, day);
+    return candidate.year == year &&
+            candidate.month == month &&
+            candidate.day == day
+        ? candidate
+        : null;
+  }
+
   (int, int)? _parseTime(String s) {
     if (s.isEmpty) return null;
     final upper = s.toUpperCase().replaceAll(' ', '');
-    // HH:mm or H:mm  (24h)
-    final hm = RegExp(r'^(\d{1,2}):(\d{2})(?:AM|PM)?$').firstMatch(upper);
-    if (hm != null) {
-      var h = int.parse(hm.group(1)!);
-      final m = int.parse(hm.group(2)!);
-      if (upper.endsWith('PM') && h < 12) h += 12;
-      if (upper.endsWith('AM') && h == 12) h = 0;
-      if (h >= 0 && h <= 23 && m >= 0 && m <= 59) return (h, m);
+    final hm = RegExp(r'^(\d{1,2}):(\d{2})(AM|PM)?$').firstMatch(upper);
+    if (hm == null) return null;
+    var hour = int.parse(hm.group(1)!);
+    final minute = int.parse(hm.group(2)!);
+    final suffix = hm.group(3);
+    if (suffix == 'PM' && hour < 12) hour += 12;
+    if (suffix == 'AM' && hour == 12) hour = 0;
+    if (hour > 23 || minute > 59) return null;
+    if (suffix != null && int.parse(hm.group(1)!) > 12) return null;
+    return (hour, minute);
+  }
+
+  int _stableHash(String value) {
+    var hash = 0x811c9dc5;
+    for (final unit in value.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 0x01000193) & 0x7fffffff;
     }
-    return null;
+    return hash;
   }
 }
