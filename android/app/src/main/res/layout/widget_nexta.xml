@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Initial / fallback layout for the NextA home-screen widget.
-  Uses only RemoteViews-compatible views (LinearLayout, TextView).
-  The Flutter alarm_scheduler replaces these TextViews at runtime.
+  Home-screen widget layout — two event card rows.
+  Only RemoteViews-compatible views: LinearLayout, TextView, View.
+  IDs match NextAWidgetProvider.kt exactly.
 -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -11,40 +11,174 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center_vertical"
-    android:padding="12dp"
+    android:padding="10dp"
     android:background="@drawable/widget_background">
 
-    <TextView
-        android:id="@+id/widget_title"
+    <!-- Slot 0: current / next event -->
+    <LinearLayout
+        android:id="@+id/slot0_card"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="NextA"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:textColor="#FFFFFFFF"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="5dp"
+        android:visibility="gone">
 
-    <TextView
-        android:id="@+id/widget_subtitle"
+        <View
+            android:id="@+id/slot0_rail"
+            android:layout_width="3dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="8dp"
+            android:background="#4CAF50" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/slot0_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/slot0_location"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="11sp"
+                android:textColor="#AAFFFFFF"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end"
+            android:layout_marginStart="6dp">
+
+            <TextView
+                android:id="@+id/slot0_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF" />
+
+            <TextView
+                android:id="@+id/slot0_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="10sp"
+                android:textColor="#4CAF50"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:id="@+id/widget_divider"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:text="Không có sự kiện sắp tới"
+        android:layout_height="1dp"
+        android:background="#33FFFFFF"
+        android:layout_marginBottom="5dp"
+        android:visibility="gone" />
+
+    <!-- Slot 1: the event after that -->
+    <LinearLayout
+        android:id="@+id/slot1_card"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/slot1_rail"
+            android:layout_width="3dp"
+            android:layout_height="match_parent"
+            android:layout_marginEnd="8dp"
+            android:background="#4CAF50" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/slot1_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/slot1_location"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="11sp"
+                android:textColor="#AAFFFFFF"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end"
+            android:layout_marginStart="6dp">
+
+            <TextView
+                android:id="@+id/slot1_time"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#FFFFFFFF" />
+
+            <TextView
+                android:id="@+id/slot1_countdown"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=""
+                android:textSize="10sp"
+                android:textColor="#4CAF50"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Empty state -->
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:text="Kh&#244;ng c&#243; s&#7921; ki&#7879;n s&#7855;p t&#7899;i"
         android:textSize="12sp"
-        android:textColor="#CCE8F0FF"
-        android:maxLines="2"
-        android:ellipsize="end" />
-
-    <TextView
-        android:id="@+id/widget_countdown"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text=""
-        android:textSize="11sp"
         android:textColor="#99E8F0FF"
-        android:maxLines="1"
-        android:ellipsize="end" />
+        android:gravity="center"
+        android:visibility="visible" />
 
 </LinearLayout>
