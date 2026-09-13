@@ -35,7 +35,7 @@
         android:paddingBottom="8dp">
 
         <TextView
-            android:id="@+id/widget_event_title"
+            android:id="@+id/widget_event_1_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
@@ -45,7 +45,7 @@
             android:textColor="#202124" />
 
         <TextView
-            android:id="@+id/widget_event_time"
+            android:id="@+id/widget_event_1_time"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
@@ -53,7 +53,7 @@
             android:textColor="#444444" />
 
         <TextView
-            android:id="@+id/widget_event_meta"
+            android:id="@+id/widget_event_1_meta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
@@ -72,7 +72,7 @@
         android:paddingBottom="4dp">
 
         <TextView
-            android:id="@+id/widget_event_title"
+            android:id="@+id/widget_event_2_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:maxLines="1"
@@ -82,7 +82,7 @@
             android:textColor="#202124" />
 
         <TextView
-            android:id="@+id/widget_event_time"
+            android:id="@+id/widget_event_2_time"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
@@ -90,7 +90,7 @@
             android:textColor="#444444" />
 
         <TextView
-            android:id="@+id/widget_event_meta"
+            android:id="@+id/widget_event_2_meta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
