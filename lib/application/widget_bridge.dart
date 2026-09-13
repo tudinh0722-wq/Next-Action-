@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/event.dart';
@@ -9,9 +10,23 @@ class WidgetBridge {
 
   static const MethodChannel _channel = MethodChannel('com.nexta/widget');
 
+  static void setEventOpenHandler(ValueChanged<String>? handler) {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method != 'openEvent') return null;
+
+      final eventId = call.arguments as String?;
+      if (eventId != null && eventId.isNotEmpty) {
+        handler?.call(eventId);
+      }
+
+      return null;
+    });
+  }
+
   static Future<void> syncEvents(List<NextAEvent> events) async {
+    final now = DateTime.now();
     final payload = events
-        .where((event) => event.end.isAfter(DateTime.now()))
+        .where((event) => event.end.isAfter(now))
         .toList()
       ..sort((a, b) => a.start.compareTo(b.start));
 
