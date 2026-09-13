@@ -7,6 +7,7 @@ import '../application/bulk_import_service.dart';
 import '../application/countdown_policy.dart';
 import '../application/recurrence_service.dart';
 import '../application/tts_service.dart';
+import '../application/widget_service.dart';
 import '../data/event_database.dart';
 import '../domain/event.dart';
 import 'widgets/event_editor_sheet.dart';
@@ -72,6 +73,10 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
 
     _startTicker();
+
+    // Push initial widget state so the home-screen card shows events
+    // as soon as the app launches, even before the first edit.
+    WidgetService.push(_events);
   }
 
   @override
@@ -89,14 +94,16 @@ class _PlannerScreenState extends State<PlannerScreen> {
       Duration(seconds: secondsUntilNextMinute),
       () {
         if (!mounted) return;
-
         setState(() {});
+        // Refresh widget countdown labels every minute.
+        WidgetService.push(_events);
 
         _countdownTimer = Timer.periodic(
           const Duration(minutes: 1),
           (_) {
             if (mounted) {
               setState(() {});
+              WidgetService.push(_events);
             }
           },
         );
@@ -125,46 +132,38 @@ class _PlannerScreenState extends State<PlannerScreen> {
     });
   }
 
-  void _shiftDay(int days) {
-    _selectDay(_selected.add(Duration(days: days)));
-  }
-
-  void _shiftWeek(int weeks) {
-    _shiftDay(weeks * 7);
-  }
+  void _shiftDay(int days) => _selectDay(_selected.add(Duration(days: days)));
+  void _shiftWeek(int weeks) => _shiftDay(weeks * 7);
 
   void _shiftMonth(int months) {
-    final target = DateTime(_month.year, _month.month + months);
+    final target  = DateTime(_month.year, _month.month + months);
     final lastDay = DateTime(target.year, target.month + 1, 0).day;
-    final day = _selected.day > lastDay ? lastDay : _selected.day;
-
+    final day     = _selected.day > lastDay ? lastDay : _selected.day;
     setState(() {
-      _month = target;
+      _month    = target;
       _selected = DateTime(target.year, target.month, day);
     });
   }
 
   void _handleVerticalSwipe(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
-
     if (velocity.abs() < 220) return;
-
-    if (velocity < 0 && _expanded) {
-      setState(() => _expanded = false);
-    }
-
-    if (velocity > 0 && !_expanded) {
-      setState(() => _expanded = true);
-    }
+    if (velocity < 0 && _expanded)  setState(() => _expanded = false);
+    if (velocity > 0 && !_expanded) setState(() => _expanded = true);
   }
 
   Future<void> _reloadEvents() async {
     final events = await widget.database.getAll();
-
     if (!mounted) return;
-
     events.sort((a, b) => a.start.compareTo(b.start));
     setState(() => _events = events);
+    WidgetService.push(_events);
+  }
+
+  // ── helper: apply event list mutation and immediately push to widget ────────
+  void _applyAndPush(void Function() mutate) {
+    setState(mutate);
+    WidgetService.push(_events);
   }
 
   Future<void> _editEvent(NextAEvent? event) async {
@@ -183,53 +182,35 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
 
     if (result.deleted && event != null) {
-      final scope = result.scope ?? RecurrenceScope.single;
-      final removed = await _recurrenceService.delete(
-        event,
-        scope,
-        _events,
-      );
-
+      final scope   = result.scope ?? RecurrenceScope.single;
+      final removed = await _recurrenceService.delete(event, scope, _events);
       if (!mounted) return;
-
-      setState(() {
-        _events.removeWhere((item) => removed.contains(item.id));
-      });
+      _applyAndPush(() => _events.removeWhere((e) => removed.contains(e.id)));
       return;
     }
 
     if (result.events.isEmpty) return;
 
     if (event != null) {
-      final scope = result.scope ?? RecurrenceScope.single;
+      final scope      = result.scope ?? RecurrenceScope.single;
       final editResult = await _recurrenceService.edit(
-        event,
-        result.events.first,
-        scope,
-        _events,
-      );
-
+          event, result.events.first, scope, _events);
       if (!mounted) return;
-
-      setState(() {
-        _events.removeWhere(
-          (item) => editResult.toRemove.contains(item.id),
-        );
+      _applyAndPush(() {
+        _events.removeWhere((e) => editResult.toRemove.contains(e.id));
         _events.addAll(editResult.toAdd);
         _events.sort((a, b) => a.start.compareTo(b.start));
       });
       return;
     }
 
+    // New event(s)
     await widget.database.upsertAll(result.events);
-
-    for (final newEvent in result.events) {
-      await widget.scheduler.scheduleEvent(newEvent);
+    for (final e in result.events) {
+      await widget.scheduler.scheduleEvent(e);
     }
-
     if (!mounted) return;
-
-    setState(() {
+    _applyAndPush(() {
       _events.addAll(result.events);
       _events.sort((a, b) => a.start.compareTo(b.start));
     });
@@ -252,30 +233,18 @@ class _PlannerScreenState extends State<PlannerScreen> {
     if (result.events.isEmpty) return;
 
     await widget.database.upsertAll(result.events);
-
-    for (final newEvent in result.events) {
-      await widget.scheduler.scheduleEvent(newEvent);
+    for (final e in result.events) {
+      await widget.scheduler.scheduleEvent(e);
     }
-
     if (!mounted) return;
-
-    setState(() {
+    _applyAndPush(() {
       _events.addAll(result.events);
       _events.sort((a, b) => a.start.compareTo(b.start));
     });
   }
 
   String _selectedHeader() {
-    const weekdays = [
-      'T.2',
-      'T.3',
-      'T.4',
-      'T.5',
-      'T.6',
-      'T.7',
-      'CN',
-    ];
-
+    const weekdays = ['T.2', 'T.3', 'T.4', 'T.5', 'T.6', 'T.7', 'CN'];
     return '${_selected.day}   ${weekdays[_selected.weekday - 1]}';
   }
 
@@ -302,9 +271,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                       behavior: HitTestBehavior.opaque,
                       onHorizontalDragEnd: (details) {
                         final velocity = details.primaryVelocity ?? 0;
-
                         if (velocity.abs() <= 200) return;
-
                         if (_expanded) {
                           _shiftMonth(velocity < 0 ? 1 : -1);
                         } else {
@@ -318,9 +285,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         eventsFor: _eventsFor,
                         onSelect: _selectDay,
                         onLongPress: _addEventForDay,
-                        animationDuration: const Duration(
-                          milliseconds: 420,
-                        ),
+                        animationDuration: const Duration(milliseconds: 420),
                       ),
                     ),
                     Expanded(
@@ -328,7 +293,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
                         behavior: HitTestBehavior.opaque,
                         onHorizontalDragEnd: (details) {
                           final velocity = details.primaryVelocity ?? 0;
-
                           if (velocity.abs() > 200) {
                             _shiftDay(velocity < 0 ? 1 : -1);
                           }
@@ -371,7 +335,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
       context: context,
       builder: (_) => _SearchDialog(database: widget.database),
     );
-
     if (!mounted || event == null) return;
     _selectDay(event.start);
   }
@@ -380,78 +343,55 @@ class _PlannerScreenState extends State<PlannerScreen> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Giao diện',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<ThemeMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: ThemeMode.system,
-                      label: Text('Hệ thống'),
-                    ),
-                    ButtonSegment(
-                      value: ThemeMode.light,
-                      label: Text('Sáng'),
-                    ),
-                    ButtonSegment(
-                      value: ThemeMode.dark,
-                      label: Text('Tối'),
-                    ),
-                  ],
-                  selected: {widget.themeMode},
-                  onSelectionChanged: (selection) {
-                    widget.onThemeChanged?.call(selection.first);
-                  },
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'Màu chủ đề',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  children: [
-                    for (final color in const [
-                      Color(0xFF1A73E8),
-                      Color(0xFF6750A4),
-                      Color(0xFF006A6A),
-                      Color(0xFF8E4A2F),
-                      Color(0xFF7A4E00),
-                    ])
-                      _SeedColorButton(
-                        color: color,
-                        onSelected: widget.onSeedColorChanged,
-                      ),
-                  ],
-                ),
-              ],
-            ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Giao diện',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(value: ThemeMode.system, label: Text('Hệ thống')),
+                  ButtonSegment(value: ThemeMode.light,  label: Text('Sáng')),
+                  ButtonSegment(value: ThemeMode.dark,   label: Text('Tối')),
+                ],
+                selected: {widget.themeMode},
+                onSelectionChanged: (s) => widget.onThemeChanged?.call(s.first),
+              ),
+              const SizedBox(height: 18),
+              const Text('Màu chủ đề',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                children: [
+                  for (final color in const [
+                    Color(0xFF1A73E8),
+                    Color(0xFF6750A4),
+                    Color(0xFF006A6A),
+                    Color(0xFF8E4A2F),
+                    Color(0xFF7A4E00),
+                  ])
+                    _SeedColorButton(color: color, onSelected: widget.onSeedColorChanged),
+                ],
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
+// ── Supporting widgets ────────────────────────────────────────────────────────
+
 class _SearchDialog extends StatefulWidget {
   const _SearchDialog({required this.database});
-
   final EventDatabase database;
-
   @override
   State<_SearchDialog> createState() => _SearchDialogState();
 }
@@ -476,55 +416,32 @@ class _SearchDialogState extends State<_SearchDialog> {
 
   void _search() {
     _debounce?.cancel();
-
-    _debounce = Timer(
-      const Duration(milliseconds: 180),
-      () async {
-        final results = await widget.database.search(_controller.text);
-
-        if (mounted) {
-          setState(() => _results = results);
-        }
-      },
-    );
+    _debounce = Timer(const Duration(milliseconds: 180), () async {
+      final results = await widget.database.search(_controller.text);
+      if (mounted) setState(() => _results = results);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 24,
-      ),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 430,
-          maxHeight: 560,
-        ),
+        constraints: const BoxConstraints(maxWidth: 430, maxHeight: 560),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Tìm kiếm',
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    IconButton(
+                Row(children: [
+                  const Expanded(
+                      child: Text('Tìm kiếm',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
+                  IconButton(
                       onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
+                      icon: const Icon(Icons.close_rounded)),
+                ]),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _controller,
@@ -539,35 +456,23 @@ class _SearchDialogState extends State<_SearchDialog> {
                 Expanded(
                   child: _results.isEmpty
                       ? Center(
-                          child: Text(
-                            'Không tìm thấy sự kiện',
-                            style: TextStyle(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        )
+                          child: Text('Không tìm thấy sự kiện',
+                              style: TextStyle(color: scheme.onSurfaceVariant)))
                       : ListView.separated(
                           padding: EdgeInsets.zero,
                           itemCount: _results.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1),
-                          itemBuilder: (_, index) {
-                            final event = _results[index];
-
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final e = _results[i];
                             return ListTile(
-                              title: Text(
-                                event.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              title: Text(e.title,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
                               subtitle: Text(
-                                '${event.start.day}/${event.start.month}/${event.start.year} · '
-                                '${event.location ?? 'Không có địa điểm'}',
-                              ),
-                              onTap: () => Navigator.pop(context, event),
+                                  '${e.start.day}/${e.start.month}/${e.start.year} · '
+                                  '${e.location ?? 'Không có địa điểm'}'),
+                              onTap: () => Navigator.pop(context, e),
                             );
-                          },
-                        ),
+                          }),
                 ),
               ],
             ),
@@ -579,27 +484,16 @@ class _SearchDialogState extends State<_SearchDialog> {
 }
 
 class _SeedColorButton extends StatelessWidget {
-  const _SeedColorButton({
-    required this.color,
-    required this.onSelected,
-  });
-
+  const _SeedColorButton({required this.color, required this.onSelected});
   final Color color;
   final ValueChanged<Color>? onSelected;
-
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
+  Widget build(BuildContext context) => GestureDetector(
       onTap: () {
         onSelected?.call(color);
         Navigator.pop(context);
       },
-      child: CircleAvatar(
-        radius: 17,
-        backgroundColor: color,
-      ),
-    );
-  }
+      child: CircleAvatar(radius: 17, backgroundColor: color));
 }
 
 class PlannerTopBar extends StatelessWidget {
@@ -614,42 +508,27 @@ class PlannerTopBar extends StatelessWidget {
 
   final String monthLabel;
   final int today;
-  final VoidCallback onMenu;
-  final VoidCallback onSearch;
-  final VoidCallback onToday;
+  final VoidCallback onMenu, onSearch, onToday;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     return SizedBox(
       height: 64,
       child: Row(
         children: [
-          IconButton(
-            onPressed: onMenu,
-            icon: const Icon(Icons.menu_rounded),
-          ),
+          IconButton(onPressed: onMenu, icon: const Icon(Icons.menu_rounded)),
           const Spacer(),
-          Text(
-            monthLabel,
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(monthLabel,
+              style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
           const Spacer(),
-          IconButton(
-            onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded),
-          ),
+          IconButton(onPressed: onSearch, icon: const Icon(Icons.search_rounded)),
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: Material(
               color: Colors.transparent,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
+                  borderRadius: BorderRadius.circular(10)),
               child: InkWell(
                 onTap: onToday,
                 borderRadius: BorderRadius.circular(10),
@@ -658,19 +537,12 @@ class PlannerTopBar extends StatelessWidget {
                   height: 38,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    border: Border.all(
-                      color: scheme.outline,
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: scheme.outline, width: 1.5),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Text(
-                    '$today',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  child: Text('$today',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w800)),
                 ),
               ),
             ),
@@ -682,19 +554,13 @@ class PlannerTopBar extends StatelessWidget {
 }
 
 class PlannerFab extends StatelessWidget {
-  const PlannerFab({
-    super.key,
-    required this.label,
-    required this.onTap,
-  });
-
+  const PlannerFab({super.key, required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     return Material(
       elevation: 3,
       shadowColor: scheme.shadow.withValues(alpha: .18),
@@ -714,14 +580,10 @@ class PlannerFab extends StatelessWidget {
                 const Icon(Icons.add_rounded, size: 18),
                 const SizedBox(width: 6),
                 Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
+                  child: Text(label,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 13)),
                 ),
               ],
             ),
