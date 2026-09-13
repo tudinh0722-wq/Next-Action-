@@ -20,6 +20,8 @@ class PlannerScreen extends StatefulWidget {
     required this.database,
     required this.scheduler,
     required this.tts,
+    this.widgetEventId,
+    this.onWidgetEventHandled,
     this.themeMode = ThemeMode.system,
     this.seedColor = const Color(0xFF1A73E8),
     this.onThemeChanged,
@@ -30,6 +32,8 @@ class PlannerScreen extends StatefulWidget {
   final EventDatabase database;
   final AlarmScheduler scheduler;
   final TtsService tts;
+  final String? widgetEventId;
+  final VoidCallback? onWidgetEventHandled;
   final ThemeMode themeMode;
   final Color seedColor;
   final ValueChanged<ThemeMode>? onThemeChanged;
@@ -72,6 +76,30 @@ class _PlannerScreenState extends State<PlannerScreen> {
     );
 
     _startTicker();
+    _handleWidgetEvent(widget.widgetEventId);
+  }
+
+  @override
+  void didUpdateWidget(covariant PlannerScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.widgetEventId != oldWidget.widgetEventId &&
+        widget.widgetEventId != null) {
+      _handleWidgetEvent(widget.widgetEventId);
+    }
+  }
+
+  void _handleWidgetEvent(String? eventId) {
+    if (eventId == null || eventId.isEmpty) return;
+
+    final event = _events.where((item) => item.id == eventId).firstOrNull;
+    if (event == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _selectDay(event.start);
+      widget.onWidgetEventHandled?.call();
+    });
   }
 
   @override
@@ -589,144 +617,12 @@ class _SeedColorButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        onSelected?.call(color);
-        Navigator.pop(context);
-      },
+    return InkWell(
+      onTap: () => onSelected?.call(color),
+      borderRadius: BorderRadius.circular(999),
       child: CircleAvatar(
-        radius: 17,
+        radius: 18,
         backgroundColor: color,
-      ),
-    );
-  }
-}
-
-class PlannerTopBar extends StatelessWidget {
-  const PlannerTopBar({
-    super.key,
-    required this.monthLabel,
-    required this.today,
-    required this.onMenu,
-    required this.onSearch,
-    required this.onToday,
-  });
-
-  final String monthLabel;
-  final int today;
-  final VoidCallback onMenu;
-  final VoidCallback onSearch;
-  final VoidCallback onToday;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      height: 64,
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: onMenu,
-            icon: const Icon(Icons.menu_rounded),
-          ),
-          const Spacer(),
-          Text(
-            monthLabel,
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            onPressed: onSearch,
-            icon: const Icon(Icons.search_rounded),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Material(
-              color: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: InkWell(
-                onTap: onToday,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: scheme.outline,
-                      width: 1.5,
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '$today',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class PlannerFab extends StatelessWidget {
-  const PlannerFab({
-    super.key,
-    required this.label,
-    required this.onTap,
-  });
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Material(
-      elevation: 3,
-      shadowColor: scheme.shadow.withValues(alpha: .18),
-      color: scheme.surfaceContainerHighest,
-      shape: const StadiumBorder(),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const StadiumBorder(),
-        child: SizedBox(
-          height: 60,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.add_rounded, size: 18),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
