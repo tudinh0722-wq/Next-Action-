@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -7,6 +9,10 @@ class EventDatabase {
   EventDatabase._(this._db);
 
   final Database _db;
+  final StreamController<List<NextAEvent>> _changes =
+      StreamController<List<NextAEvent>>.broadcast();
+
+  Stream<List<NextAEvent>> get changes => _changes.stream;
 
   static Future<EventDatabase> open() async {
     final databasesPath = await getDatabasesPath();
@@ -81,34 +87,70 @@ class EventDatabase {
   Future<void> replaceAll(List<NextAEvent> events) async {
     await _db.transaction((txn) async {
       for (final event in events) {
-        await txn.insert('events', _toRow(event), conflictAlgorithm: ConflictAlgorithm.replace);
+        await txn.insert(
+          'events',
+          _toRow(event),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     });
+    await _emitChanged();
   }
 
   Future<void> upsert(NextAEvent event) async {
-    await _db.insert('events', _toRow(event), conflictAlgorithm: ConflictAlgorithm.replace);
+    await _db.insert(
+      'events',
+      _toRow(event),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    await _emitChanged();
   }
 
   Future<void> upsertAll(List<NextAEvent> events) async {
     await _db.transaction((txn) async {
       for (final event in events) {
-        await txn.insert('events', _toRow(event), conflictAlgorithm: ConflictAlgorithm.replace);
+        await txn.insert(
+          'events',
+          _toRow(event),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
     });
+    await _emitChanged();
   }
 
-  Future<void> delete(String id) => _db.delete('events', where: 'id = ?', whereArgs: [id]);
+  Future<void> delete(String id) async {
+    await _db.delete('events', where: 'id = ?', whereArgs: [id]);
+    await _emitChanged();
+  }
 
-  Future<void> deleteSeries(String recurrenceId) => _db.delete('events', where: 'recurrence_id = ?', whereArgs: [recurrenceId]);
+  Future<void> deleteSeries(String recurrenceId) async {
+    await _db.delete(
+      'events',
+      where: 'recurrence_id = ?',
+      whereArgs: [recurrenceId],
+    );
+    await _emitChanged();
+  }
 
-  Future<void> deleteSeriesFrom(String recurrenceId, DateTime start) => _db.delete(
-        'events',
-        where: 'recurrence_id = ? AND start_ms >= ?',
-        whereArgs: [recurrenceId, start.millisecondsSinceEpoch],
-      );
+  Future<void> deleteSeriesFrom(String recurrenceId, DateTime start) async {
+    await _db.delete(
+      'events',
+      where: 'recurrence_id = ? AND start_ms >= ?',
+      whereArgs: [recurrenceId, start.millisecondsSinceEpoch],
+    );
+    await _emitChanged();
+  }
 
-  Future<void> close() => _db.close();
+  Future<void> _emitChanged() async {
+    if (_changes.isClosed) return;
+    _changes.add(await getAll());
+  }
+
+  Future<void> close() async {
+    await _db.close();
+    await _changes.close();
+  }
 
   Map<String, Object?> _toRow(NextAEvent event) => {
         'id': event.id,
@@ -124,10 +166,12 @@ class EventDatabase {
         'recurrence_interval': event.recurrenceRule?.interval,
         'recurrence_end_mode': event.recurrenceRule?.endMode.index,
         'recurrence_count': event.recurrenceRule?.count,
-        'recurrence_until_ms': event.recurrenceRule?.until?.millisecondsSinceEpoch,
+        'recurrence_until_ms':
+            event.recurrenceRule?.until?.millisecondsSinceEpoch,
         'reminder_minutes': event.reminderMinutes,
         'reminder_repeat_count': event.reminderRepeatCount,
-        'reminder_repeat_interval_minutes': event.reminderRepeatIntervalMinutes,
+        'reminder_repeat_interval_minutes':
+            event.reminderRepeatIntervalMinutes,
       };
 
   NextAEvent _fromRow(Map<String, Object?> row) {
@@ -137,9 +181,15 @@ class EventDatabase {
         : RecurrenceRule(
             frequency: RecurrenceFrequency.values[frequencyIndex],
             interval: (row['recurrence_interval'] as int?) ?? 1,
-            endMode: RecurrenceEndMode.values[(row['recurrence_end_mode'] as int?) ?? 0],
+            endMode: RecurrenceEndMode.values[
+              (row['recurrence_end_mode'] as int?) ?? 0
+            ],
             count: (row['recurrence_count'] as int?) ?? 20,
-            until: row['recurrence_until_ms'] == null ? null : DateTime.fromMillisecondsSinceEpoch(row['recurrence_until_ms'] as int),
+            until: row['recurrence_until_ms'] == null
+                ? null
+                : DateTime.fromMillisecondsSinceEpoch(
+                    row['recurrence_until_ms'] as int,
+                  ),
           );
     return NextAEvent(
       id: row['id'] as String,
@@ -154,7 +204,8 @@ class EventDatabase {
       recurrenceRule: recurrenceRule,
       reminderMinutes: (row['reminder_minutes'] as int?) ?? 10,
       reminderRepeatCount: (row['reminder_repeat_count'] as int?) ?? 2,
-      reminderRepeatIntervalMinutes: (row['reminder_repeat_interval_minutes'] as int?) ?? 5,
+      reminderRepeatIntervalMinutes:
+          (row['reminder_repeat_interval_minutes'] as int?) ?? 5,
     );
   }
 }
