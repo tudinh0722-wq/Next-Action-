@@ -3,8 +3,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
-    android:background="@drawable/nexta_widget_background">
+    android:padding="12dp"
+    android:background="#F7F7F7">
 
     <TextView
         android:id="@+id/widget_header"
@@ -13,7 +13,6 @@
         android:text="NEXTA"
         android:textSize="12sp"
         android:textStyle="bold"
-        android:letterSpacing="0.08"
         android:textColor="#666666" />
 
     <TextView
@@ -31,8 +30,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingTop="10dp"
-        android:paddingBottom="8dp">
+        android:paddingTop="8dp"
+        android:paddingBottom="6dp">
 
         <TextView
             android:id="@+id/widget_event_1_title"
@@ -48,7 +47,7 @@
             android:id="@+id/widget_event_1_time"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="2dp"
             android:textSize="13sp"
             android:textColor="#444444" />
 
@@ -68,8 +67,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingTop="8dp"
-        android:paddingBottom="4dp">
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp">
 
         <TextView
             android:id="@+id/widget_event_2_title"
@@ -85,7 +84,7 @@
             android:id="@+id/widget_event_2_time"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="2dp"
             android:textSize="13sp"
             android:textColor="#444444" />
 
