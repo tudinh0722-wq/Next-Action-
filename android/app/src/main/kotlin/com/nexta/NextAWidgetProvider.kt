@@ -25,10 +25,24 @@ class NextAWidgetProvider : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val component = ComponentName(context, NextAWidgetProvider::class.java)
             val ids = manager.getAppWidgetIds(component)
-            if (ids.isNotEmpty()) {
-                ids.forEach { id ->
-                    manager.updateAppWidget(id, buildViews(context))
-                }
+
+            ids.forEach { appWidgetId ->
+                updateOne(context, manager, appWidgetId)
+            }
+        }
+
+        private fun updateOne(
+            context: Context,
+            manager: AppWidgetManager,
+            appWidgetId: Int,
+        ) {
+            try {
+                manager.updateAppWidget(appWidgetId, buildViews(context))
+            } catch (_: Exception) {
+                manager.updateAppWidget(
+                    appWidgetId,
+                    buildFallbackViews(context),
+                )
             }
         }
 
@@ -37,41 +51,58 @@ class NextAWidgetProvider : AppWidgetProvider() {
             val events = readEvents(context)
 
             if (events.isEmpty()) {
-                views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
-                views.setViewVisibility(R.id.widget_event_1, View.GONE)
-                views.setViewVisibility(R.id.widget_event_2, View.GONE)
+                showEmpty(views)
                 return views
             }
 
             views.setViewVisibility(R.id.widget_empty, View.GONE)
+            views.setViewVisibility(R.id.widget_event_1, View.VISIBLE)
+
             bindEvent(
-                context,
-                views,
-                R.id.widget_event_1,
-                R.id.widget_event_1_title,
-                R.id.widget_event_1_time,
-                R.id.widget_event_1_meta,
-                events[0],
-                0,
+                context = context,
+                views = views,
+                rowId = R.id.widget_event_1,
+                titleId = R.id.widget_event_1_title,
+                timeId = R.id.widget_event_1_time,
+                metaId = R.id.widget_event_1_meta,
+                event = events[0],
+                requestCode = 0,
             )
 
             if (events.size > 1) {
                 views.setViewVisibility(R.id.widget_event_2, View.VISIBLE)
                 bindEvent(
-                    context,
-                    views,
-                    R.id.widget_event_2,
-                    R.id.widget_event_2_title,
-                    R.id.widget_event_2_time,
-                    R.id.widget_event_2_meta,
-                    events[1],
-                    1,
+                    context = context,
+                    views = views,
+                    rowId = R.id.widget_event_2,
+                    titleId = R.id.widget_event_2_title,
+                    timeId = R.id.widget_event_2_time,
+                    metaId = R.id.widget_event_2_meta,
+                    event = events[1],
+                    requestCode = 1,
                 )
             } else {
                 views.setViewVisibility(R.id.widget_event_2, View.GONE)
             }
 
             return views
+        }
+
+        private fun buildFallbackViews(context: Context): RemoteViews {
+            val views = RemoteViews(context.packageName, R.layout.nexta_widget)
+            views.setTextViewText(R.id.widget_header, "NEXTA")
+            views.setTextViewText(
+                R.id.widget_empty,
+                "NextA widget đang khởi động",
+            )
+            showEmpty(views)
+            return views
+        }
+
+        private fun showEmpty(views: RemoteViews) {
+            views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
+            views.setViewVisibility(R.id.widget_event_1, View.GONE)
+            views.setViewVisibility(R.id.widget_event_2, View.GONE)
         }
 
         private fun bindEvent(
@@ -89,7 +120,11 @@ class NextAWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(metaId, event.location ?: "NextA")
             views.setOnClickPendingIntent(
                 rowId,
-                createEventPendingIntent(context, event.id, requestCode),
+                createEventPendingIntent(
+                    context = context,
+                    eventId = event.id,
+                    requestCode = requestCode,
+                ),
             )
         }
 
@@ -101,14 +136,17 @@ class NextAWidgetProvider : AppWidgetProvider() {
             val intent = Intent(context, MainActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
                 data = Uri.parse("nexta://event/${Uri.encode(eventId)}")
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
                 putExtra(EVENT_ID_EXTRA, eventId)
             }
+
             return PendingIntent.getActivity(
                 context,
                 4000 + requestCode,
                 intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE,
             )
         }
 
@@ -120,20 +158,22 @@ class NextAWidgetProvider : AppWidgetProvider() {
 
             return try {
                 val array = JSONArray(json)
-                buildList {
-                    for (index in 0 until array.length()) {
-                        val item = array.getJSONObject(index)
-                        add(
-                            WidgetEvent(
-                                id = item.getString("id"),
-                                title = item.getString("title"),
-                                start = item.getLong("start"),
-                                location = item.optString("location")
-                                    .takeIf { it.isNotBlank() },
-                            ),
-                        )
-                    }
+                val result = mutableListOf<WidgetEvent>()
+
+                for (index in 0 until array.length()) {
+                    val item = array.getJSONObject(index)
+                    result.add(
+                        WidgetEvent(
+                            id = item.getString("id"),
+                            title = item.getString("title"),
+                            start = item.getLong("start"),
+                            location = item.optString("location")
+                                .takeIf { it.isNotBlank() },
+                        ),
+                    )
                 }
+
+                result
             } catch (_: Exception) {
                 emptyList()
             }
@@ -147,11 +187,17 @@ class NextAWidgetProvider : AppWidgetProvider() {
         }
     }
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        updateAll(context)
+    }
+
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
     ) {
+        super.onUpdate(context, appWidgetManager, appWidgetIds)
         updateAll(context)
     }
 
