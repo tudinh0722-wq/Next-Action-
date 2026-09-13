@@ -7,7 +7,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Bundle
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -27,17 +26,9 @@ class NextAWidgetProvider : AppWidgetProvider() {
             val component = ComponentName(context, NextAWidgetProvider::class.java)
             val ids = manager.getAppWidgetIds(component)
             if (ids.isNotEmpty()) {
-                updateWidgets(context, manager, ids)
-            }
-        }
-
-        private fun updateWidgets(
-            context: Context,
-            manager: AppWidgetManager,
-            ids: IntArray,
-        ) {
-            ids.forEach { id ->
-                manager.updateAppWidget(id, buildViews(context))
+                ids.forEach { id ->
+                    manager.updateAppWidget(id, buildViews(context))
+                }
             }
         }
 
@@ -53,11 +44,29 @@ class NextAWidgetProvider : AppWidgetProvider() {
             }
 
             views.setViewVisibility(R.id.widget_empty, View.GONE)
-            bindEvent(context, views, R.id.widget_event_1, events[0], 0)
+            bindEvent(
+                context,
+                views,
+                R.id.widget_event_1,
+                R.id.widget_event_1_title,
+                R.id.widget_event_1_time,
+                R.id.widget_event_1_meta,
+                events[0],
+                0,
+            )
 
             if (events.size > 1) {
                 views.setViewVisibility(R.id.widget_event_2, View.VISIBLE)
-                bindEvent(context, views, R.id.widget_event_2, events[1], 1)
+                bindEvent(
+                    context,
+                    views,
+                    R.id.widget_event_2,
+                    R.id.widget_event_2_title,
+                    R.id.widget_event_2_time,
+                    R.id.widget_event_2_meta,
+                    events[1],
+                    1,
+                )
             } else {
                 views.setViewVisibility(R.id.widget_event_2, View.GONE)
             }
@@ -69,12 +78,15 @@ class NextAWidgetProvider : AppWidgetProvider() {
             context: Context,
             views: RemoteViews,
             rowId: Int,
+            titleId: Int,
+            timeId: Int,
+            metaId: Int,
             event: WidgetEvent,
             requestCode: Int,
         ) {
-            views.setTextViewText(rowId, R.id.widget_event_title, event.title)
-            views.setTextViewText(rowId, R.id.widget_event_time, formatTime(event.start))
-            views.setTextViewText(rowId, R.id.widget_event_meta, formatMeta(event))
+            views.setTextViewText(titleId, event.title)
+            views.setTextViewText(timeId, formatTime(event.start))
+            views.setTextViewText(metaId, event.location ?: "NextA")
             views.setOnClickPendingIntent(
                 rowId,
                 createEventPendingIntent(context, event.id, requestCode),
@@ -116,8 +128,8 @@ class NextAWidgetProvider : AppWidgetProvider() {
                                 id = item.getString("id"),
                                 title = item.getString("title"),
                                 start = item.getLong("start"),
-                                end = item.getLong("end"),
-                                location = item.optString("location").takeIf { it.isNotBlank() },
+                                location = item.optString("location")
+                                    .takeIf { it.isNotBlank() },
                             ),
                         )
                     }
@@ -128,12 +140,10 @@ class NextAWidgetProvider : AppWidgetProvider() {
         }
 
         private fun formatTime(millis: Long): String {
-            return SimpleDateFormat("EEE, dd/MM · HH:mm", Locale("vi", "VN"))
-                .format(Date(millis))
-        }
-
-        private fun formatMeta(event: WidgetEvent): String {
-            return event.location ?: "NextA"
+            return SimpleDateFormat(
+                "EEE, dd/MM · HH:mm",
+                Locale("vi", "VN"),
+            ).format(Date(millis))
         }
     }
 
@@ -157,6 +167,5 @@ data class WidgetEvent(
     val id: String,
     val title: String,
     val start: Long,
-    val end: Long,
     val location: String?,
 )
