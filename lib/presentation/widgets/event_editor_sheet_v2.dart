@@ -379,7 +379,10 @@ class _EventEditorSheetState extends State<_EventEditorSheet> {
   Future<void> _pickRecurrence() async {
     final result = await showDialog<RecurrenceRule>(
       context: context,
-      builder: (_) => _RecurrenceDialog(initial: _recurrenceRule),
+      builder: (_) => _RecurrenceDialog(
+        initial: _recurrenceRule,
+        start: _start,
+      ),
     );
 
     if (result != null) {
@@ -584,13 +587,23 @@ class _EventContent extends StatelessWidget {
   }
 
   String _recurrenceLabel() {
-    return switch (recurrence.frequency) {
-      RecurrenceFrequency.none => 'Không lặp lại',
+    if (recurrence.frequency == RecurrenceFrequency.none) {
+      return 'Không lặp lại';
+    }
+
+    final frequency = switch (recurrence.frequency) {
       RecurrenceFrequency.daily => 'Hàng ngày',
       RecurrenceFrequency.weekly => 'Hàng tuần',
       RecurrenceFrequency.weekdays => 'Ngày trong tuần',
       RecurrenceFrequency.monthly => 'Hàng tháng',
+      RecurrenceFrequency.none => 'Không lặp lại',
     };
+
+    final end = recurrence.endMode == RecurrenceEndMode.until
+        ? 'đến ${recurrence.until!.day}/${recurrence.until!.month}/${recurrence.until!.year}'
+        : '${recurrence.count ?? 20} lần';
+
+    return '$frequency · $end';
   }
 
   @override
@@ -1177,61 +1190,213 @@ class _ReminderDialogState extends State<_ReminderDialog> {
 }
 
 class _RecurrenceDialog extends StatefulWidget {
-  const _RecurrenceDialog({required this.initial});
+  const _RecurrenceDialog({
+    required this.initial,
+    required this.start,
+  });
 
   final RecurrenceRule initial;
+  final DateTime start;
 
   @override
   State<_RecurrenceDialog> createState() => _RecurrenceDialogState();
 }
 
 class _RecurrenceDialogState extends State<_RecurrenceDialog> {
-  late RecurrenceRule rule;
+  late RecurrenceFrequency frequency;
+  late int interval;
+  late RecurrenceEndMode endMode;
+  late int count;
+  late DateTime until;
 
   @override
   void initState() {
     super.initState();
-    rule = widget.initial;
+    frequency = widget.initial.frequency;
+    interval = widget.initial.interval;
+    endMode = widget.initial.endMode;
+    count = widget.initial.count ?? 20;
+    until = widget.initial.until ?? widget.start.add(const Duration(days: 90));
+  }
+
+  String _frequencyLabel(RecurrenceFrequency value) {
+    return switch (value) {
+      RecurrenceFrequency.none => 'Không lặp lại',
+      RecurrenceFrequency.daily => 'Hàng ngày',
+      RecurrenceFrequency.weekly => 'Hàng tuần',
+      RecurrenceFrequency.weekdays => 'Ngày trong tuần',
+      RecurrenceFrequency.monthly => 'Hàng tháng',
+    };
+  }
+
+  Future<void> _pickUntil() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: until.isBefore(widget.start) ? widget.start : until,
+      firstDate: widget.start,
+      lastDate: DateTime(2100),
+    );
+
+    if (date != null) {
+      setState(() {
+        until = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          widget.start.hour,
+          widget.start.minute,
+        );
+      });
+    }
+  }
+
+  void _submit() {
+    if (frequency == RecurrenceFrequency.none) {
+      Navigator.pop(
+        context,
+        const RecurrenceRule(frequency: RecurrenceFrequency.none),
+      );
+      return;
+    }
+
+    final safeCount = count.clamp(1, 366).toInt();
+
+    Navigator.pop(
+      context,
+      RecurrenceRule(
+        frequency: frequency,
+        interval: interval.clamp(1, 366).toInt(),
+        endMode: endMode,
+        count: safeCount,
+        until: endMode == RecurrenceEndMode.until ? until : null,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Lặp lại'),
-      content: DropdownButtonFormField<RecurrenceFrequency>(
-        initialValue: rule.frequency,
-        items: const [
-          DropdownMenuItem(
-            value: RecurrenceFrequency.none,
-            child: Text('Không lặp lại'),
-          ),
-          DropdownMenuItem(
-            value: RecurrenceFrequency.daily,
-            child: Text('Hàng ngày'),
-          ),
-          DropdownMenuItem(
-            value: RecurrenceFrequency.weekly,
-            child: Text('Hàng tuần'),
-          ),
-          DropdownMenuItem(
-            value: RecurrenceFrequency.weekdays,
-            child: Text('Ngày trong tuần'),
-          ),
-          DropdownMenuItem(
-            value: RecurrenceFrequency.monthly,
-            child: Text('Hàng tháng'),
-          ),
-        ],
-        onChanged: (value) {
-          if (value == null) return;
-          setState(() {
-            rule = RecurrenceRule(
-              frequency: value,
-              count: rule.count,
-              until: rule.until,
-            );
-          });
-        },
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<RecurrenceFrequency>(
+              initialValue: frequency,
+              decoration: const InputDecoration(labelText: 'Lặp lại'),
+              items: RecurrenceFrequency.values
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(_frequencyLabel(value)),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => frequency = value);
+                }
+              },
+            ),
+            if (frequency != RecurrenceFrequency.none) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Expanded(child: Text('Khoảng cách')),
+                  SizedBox(
+                    width: 92,
+                    child: DropdownButtonFormField<int>(
+                      initialValue: interval,
+                      items: const [1, 2, 3, 4]
+                          .map(
+                            (value) => DropdownMenuItem(
+                              value: value,
+                              child: Text('$value'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => interval = value);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Kết thúc lặp',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+              ),
+              RadioListTile<RecurrenceEndMode>(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                value: RecurrenceEndMode.count,
+                groupValue: endMode,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => endMode = value);
+                  }
+                },
+                title: Row(
+                  children: [
+                    const Text('Sau'),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 74,
+                      child: TextFormField(
+                        initialValue: '$count',
+                        keyboardType: TextInputType.number,
+                        enabled: endMode == RecurrenceEndMode.count,
+                        onChanged: (value) {
+                          final parsed = int.tryParse(value);
+                          if (parsed != null) count = parsed;
+                        },
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          suffixText: 'lần',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              RadioListTile<RecurrenceEndMode>(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                value: RecurrenceEndMode.until,
+                groupValue: endMode,
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => endMode = value);
+                  }
+                },
+                title: InkWell(
+                  onTap: _pickUntil,
+                  child: Row(
+                    children: [
+                      const Text('Đến ngày'),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${until.day.toString().padLeft(2, '0')}/'
+                        '${until.month.toString().padLeft(2, '0')}/'
+                        '${until.year}',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1239,7 +1404,7 @@ class _RecurrenceDialogState extends State<_RecurrenceDialog> {
           child: const Text('Hủy'),
         ),
         FilledButton(
-          onPressed: () => Navigator.pop(context, rule),
+          onPressed: _submit,
           child: const Text('Xong'),
         ),
       ],
