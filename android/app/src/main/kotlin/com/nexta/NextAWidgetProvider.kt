@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -19,7 +18,6 @@ class NextAWidgetProvider : AppWidgetProvider() {
         const val ACTION_SYNC = "com.nexta.action.SYNC_WIDGET"
         const val PREFS_NAME = "nexta_widget"
         const val EVENTS_KEY = "events_json"
-        const val EVENT_ID_EXTRA = "nexta_event_id"
 
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -120,25 +118,17 @@ class NextAWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(metaId, event.location ?: "NextA")
             views.setOnClickPendingIntent(
                 rowId,
-                createEventPendingIntent(
-                    context = context,
-                    eventId = event.id,
-                    requestCode = requestCode,
-                ),
+                createAppLaunchPendingIntent(context, requestCode),
             )
         }
 
-        private fun createEventPendingIntent(
+        private fun createAppLaunchPendingIntent(
             context: Context,
-            eventId: String,
             requestCode: Int,
         ): PendingIntent {
             val intent = Intent(context, MainActivity::class.java).apply {
-                action = Intent.ACTION_VIEW
-                data = Uri.parse("nexta://event/${Uri.encode(eventId)}")
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or
                     Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra(EVENT_ID_EXTRA, eventId)
             }
 
             return PendingIntent.getActivity(
