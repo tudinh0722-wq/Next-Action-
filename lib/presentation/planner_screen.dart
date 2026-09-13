@@ -627,3 +627,133 @@ class _SeedColorButton extends StatelessWidget {
     );
   }
 }
+
+class PlannerTopBar extends StatelessWidget {
+  const PlannerTopBar({
+    super.key,
+    required this.monthLabel,
+    required this.today,
+    required this.onMenu,
+    required this.onSearch,
+    required this.onToday,
+  });
+
+  final String monthLabel;
+  final int today;
+  final VoidCallback onMenu;
+  final VoidCallback onSearch;
+  final VoidCallback onToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return SizedBox(
+      height: 64,
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onMenu,
+            icon: const Icon(Icons.menu_rounded),
+          ),
+          const Spacer(),
+          Text(
+            monthLabel,
+            style: const TextStyle(
+              fontSize: 21,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: onSearch,
+            icon: const Icon(Icons.search_rounded),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: InkWell(
+                onTap: onToday,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: scheme.outline,
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$today',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PlannerFab extends StatelessWidget {
+  const PlannerFab({
+    super.key,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      elevation: 3,
+      shadowColor: scheme.shadow.withValues(alpha: .18),
+      color: scheme.surfaceContainerHighest,
+      shape: const StadiumBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: SizedBox(
+          height: 60,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.add_rounded, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
