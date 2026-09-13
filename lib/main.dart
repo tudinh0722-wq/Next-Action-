@@ -19,8 +19,6 @@ Future<void> main() async {
   final scheduler = await AlarmScheduler.init(tts);
   final database = await EventDatabase.open();
 
-  // Remove the old development-only alarm from databases created by previous
-  // builds. NextA no longer creates a test event automatically.
   const debugAlarmId = '__nexta_debug_alarm_test__';
   await scheduler.cancelEvent(debugAlarmId);
   await database.delete(debugAlarmId);
@@ -31,27 +29,21 @@ Future<void> main() async {
     await database.replaceAll(events);
   }
 
-  // Prime the Android Home Widget immediately. Subsequent SQLite changes are
-  // exposed through EventDatabase.changes and can be synced by the app layer.
   unawaited(WidgetBridge.syncEvents(events));
 
-  runApp(NextAApp(
-    database: database,
-    scheduler: scheduler,
-    tts: tts,
-    initialEvents: events,
-  ));
-
-  // Keep the widget snapshot synchronized after CRUD/import/recurrence writes.
-  unawaited(
-    database.changes.listen((changedEvents) {
-      unawaited(WidgetBridge.syncEvents(changedEvents));
-    }),
+  runApp(
+    NextAApp(
+      database: database,
+      scheduler: scheduler,
+      tts: tts,
+      initialEvents: events,
+    ),
   );
 
-  // Scheduling is deliberately started after runApp so a system permission
-  // screen cannot block the first Flutter frame. The scheduler still restores
-  // all future alarms on every app launch.
+  database.changes.listen((changedEvents) {
+    unawaited(WidgetBridge.syncEvents(changedEvents));
+  });
+
   unawaited(scheduler.scheduleAll(events));
 }
 
@@ -108,11 +100,13 @@ class _NextAAppState extends State<NextAApp> {
       builder: (lightDynamic, darkDynamic) {
         final light =
             lightDynamic ?? ColorScheme.fromSeed(seedColor: _seedColor);
-        final dark = darkDynamic ??
-            ColorScheme.fromSeed(
-              seedColor: _seedColor,
-              brightness: Brightness.dark,
-            );
+        final dark =
+            darkDynamic ??
+                ColorScheme.fromSeed(
+                  seedColor: _seedColor,
+                  brightness: Brightness.dark,
+                );
+
         return MaterialApp(
           title: 'NextA',
           debugShowCheckedModeBanner: false,
@@ -131,9 +125,12 @@ class _NextAAppState extends State<NextAApp> {
                   tts: widget.tts,
                   themeMode: _themeMode,
                   seedColor: _seedColor,
-                  onThemeChanged: (mode) => setState(() => _themeMode = mode),
-                  onSeedColorChanged: (color) =>
-                      setState(() => _seedColor = color),
+                  onThemeChanged: (mode) {
+                    setState(() => _themeMode = mode);
+                  },
+                  onSeedColorChanged: (color) {
+                    setState(() => _seedColor = color);
+                  },
                 ),
         );
       },
@@ -141,12 +138,20 @@ class _NextAAppState extends State<NextAApp> {
   }
 }
 
-// ── Demo data factory ──────────────────────────────────────────────────────────────
+// ── Demo data factory ────────────────────────────────────────────────────────
 // DateTime is not const, so demo events must be created at runtime.
 
 List<NextAEvent> _buildDemoEvents() {
-  const r10 = (reminderMinutes: 10, repeatCount: 2, intervalMinutes: 5);
-  const rTmdt = (reminderMinutes: 30, repeatCount: 2, intervalMinutes: 4);
+  const r10 = (
+    reminderMinutes: 10,
+    repeatCount: 2,
+    intervalMinutes: 5,
+  );
+  const rTmdt = (
+    reminderMinutes: 30,
+    repeatCount: 2,
+    intervalMinutes: 4,
+  );
 
   NextAEvent base({
     required String id,
@@ -157,7 +162,11 @@ List<NextAEvent> _buildDemoEvents() {
     String? location,
     String? note,
     int priority = 0,
-    required ({int reminderMinutes, int repeatCount, int intervalMinutes}) r,
+    required ({
+      int reminderMinutes,
+      int repeatCount,
+      int intervalMinutes,
+    }) r,
   }) =>
       NextAEvent(
         id: id,
