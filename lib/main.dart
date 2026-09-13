@@ -70,15 +70,32 @@ class _NextAAppState extends State<NextAApp> {
   Color _seedColor = const Color(0xFF1A73E8);
   AlarmAlert? _activeAlarm;
   StreamSubscription<AlarmAlert>? _alarmSubscription;
+  String? _widgetEventId;
 
   @override
   void initState() {
     super.initState();
     _activeAlarm = AlarmAlertController.pending;
+
     _alarmSubscription = AlarmAlertController.stream.listen((alert) {
       if (!mounted) return;
       setState(() => _activeAlarm = alert);
     });
+
+    _initWidgetEvent();
+
+    WidgetBridge.setEventOpenHandler((eventId) {
+      if (!mounted) return;
+      setState(() => _widgetEventId = eventId);
+    });
+  }
+
+  Future<void> _initWidgetEvent() async {
+    final eventId = await WidgetBridge.getInitialEventId();
+
+    if (!mounted || eventId == null || eventId.isEmpty) return;
+
+    setState(() => _widgetEventId = eventId);
   }
 
   @override
@@ -119,10 +136,16 @@ class _NextAAppState extends State<NextAApp> {
                   scheduler: widget.scheduler,
                 )
               : PlannerScreen(
+                  key: ValueKey(_widgetEventId),
                   events: widget.initialEvents,
                   database: widget.database,
                   scheduler: widget.scheduler,
                   tts: widget.tts,
+                  widgetEventId: _widgetEventId,
+                  onWidgetEventHandled: () {
+                    if (!mounted) return;
+                    setState(() => _widgetEventId = null);
+                  },
                   themeMode: _themeMode,
                   seedColor: _seedColor,
                   onThemeChanged: (mode) {
