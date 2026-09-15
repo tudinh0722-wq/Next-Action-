@@ -24,6 +24,9 @@ class AlarmScreen extends StatefulWidget {
 class _AlarmScreenState extends State<AlarmScreen> {
   Timer? _autoDismissTimer;
   bool _closing = false;
+  double _dragProgress = 0;
+
+  static const _swipeTriggerFraction = 0.72;
 
   @override
   void initState() {
@@ -42,9 +45,9 @@ class _AlarmScreenState extends State<AlarmScreen> {
     setState(() => _closing = true);
     _autoDismissTimer?.cancel();
 
-    // cancelEvent intentionally cancels the remaining reminder slots for this
-    // concrete event. Recurring occurrences have distinct event IDs, so the
-    // next occurrence is not affected.
+    // Confirming the alarm intentionally cancels all remaining reminder slots
+    // for this concrete event. Recurring occurrences have distinct event IDs,
+    // so confirming one occurrence does not cancel the next occurrence.
     await widget.scheduler.cancelEvent(widget.alert.eventId);
     if (!mounted) return;
     AlarmAlertController.consumePending();
@@ -54,6 +57,23 @@ class _AlarmScreenState extends State<AlarmScreen> {
     if (_closing) return;
     _closing = true;
     AlarmAlertController.consumePending();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (_closing) return;
+    final width = context.size?.width ?? 1;
+    setState(() {
+      _dragProgress = (_dragProgress + details.delta.dx / width).clamp(0.0, 1.0);
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (_closing) return;
+    if (_dragProgress >= _swipeTriggerFraction) {
+      _acknowledge();
+      return;
+    }
+    setState(() => _dragProgress = 0);
   }
 
   @override
@@ -80,62 +100,129 @@ class _AlarmScreenState extends State<AlarmScreen> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-            child: Column(
-              children: [
-                const Spacer(flex: 2),
-                Icon(
-                  Icons.notifications_active_rounded,
-                  size: 72,
-                  color: scheme.primary,
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  reminderText,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  widget.alert.title,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        color: scheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                if (widget.alert.note != null) ...[
-                  const SizedBox(height: 16),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragUpdate: _onHorizontalDragUpdate,
+            onHorizontalDragEnd: _onHorizontalDragEnd,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
+              child: Column(
+                children: [
+                  const Spacer(flex: 2),
+                  Icon(
+                    Icons.notifications_active_rounded,
+                    size: 72,
+                    color: scheme.primary,
+                  ),
+                  const SizedBox(height: 28),
                   Text(
-                    widget.alert.note!,
+                    reminderText,
                     textAlign: TextAlign.center,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
                         ),
                   ),
-                ],
-                const Spacer(flex: 3),
-                SizedBox(
-                  width: double.infinity,
-                  child: FloatingActionButton.extended(
-                    onPressed: _closing ? null : _acknowledge,
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('XÁC NHẬN'),
-                    elevation: 6,
-                    extendedPadding:
-                        const EdgeInsets.symmetric(horizontal: 30),
+                  const SizedBox(height: 14),
+                  Text(
+                    widget.alert.title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          color: scheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
-                ),
-              ],
+                  if (widget.alert.note != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      widget.alert.note!,
+                      textAlign: TextAlign.center,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                  const Spacer(flex: 3),
+                  _SwipeToAcknowledge(
+                    progress: _dragProgress,
+                    enabled: !_closing,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _SwipeToAcknowledge extends StatelessWidget {
+  const _SwipeToAcknowledge({
+    required this.progress,
+    required this.enabled,
+  });
+
+  final double progress;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final effectiveProgress = progress.clamp(0.0, 1.0);
+
+    return Container(
+      height: 68,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(34),
+        color: scheme.surface.withOpacity(0.72),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          const knobSize = 56.0;
+          const horizontalPadding = 6.0;
+          final travel = constraints.maxWidth - knobSize - horizontalPadding * 2;
+          final offset = horizontalPadding + travel * effectiveProgress;
+
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              Text(
+                enabled ? 'VUỐT SANG PHẢI ĐỂ XÁC NHẬN' : 'ĐANG XÁC NHẬN...',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+              ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 80),
+                curve: Curves.easeOut,
+                left: offset,
+                top: horizontalPadding,
+                child: Container(
+                  width: knobSize,
+                  height: knobSize,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: scheme.primary,
+                    boxShadow: const [
+                      BoxShadow(blurRadius: 8, spreadRadius: 1),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: scheme.onPrimary,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
