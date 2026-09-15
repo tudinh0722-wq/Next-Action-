@@ -1,5 +1,6 @@
 package com.nexta
 
+import android.app.AlarmManager
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -7,6 +8,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
 import org.json.JSONArray
@@ -18,9 +20,12 @@ import java.util.concurrent.TimeUnit
 class NextAWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_SYNC = "com.nexta.action.SYNC_WIDGET"
+        private const val ACTION_REFRESH = "com.nexta.action.REFRESH_WIDGET"
         const val PREFS_NAME = "nexta_widget"
         const val EVENTS_KEY = "events_json"
         const val EVENT_ID_EXTRA = "nexta_event_id"
+        private const val REFRESH_REQUEST_CODE = 3999
+        private const val REFRESH_INTERVAL_MILLIS = 60_000L
 
         fun updateAll(context: Context) {
             val manager = AppWidgetManager.getInstance(context)
@@ -32,13 +37,16 @@ class NextAWidgetProvider : AppWidgetProvider() {
                     manager.updateAppWidget(id, buildViews(context))
                 }
             }
+
+            scheduleRefresh(context)
         }
 
         private fun buildViews(context: Context): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.nexta_widget)
             val events = readEvents(context)
+            val now = System.currentTimeMillis()
             val upcomingEvents = events
-                .filter { it.end > System.currentTimeMillis() }
+                .filter { it.end > now }
                 .sortedBy { it.start }
 
             if (upcomingEvents.isEmpty()) {
@@ -146,6 +154,43 @@ class NextAWidgetProvider : AppWidgetProvider() {
             )
         }
 
+        private fun scheduleRefresh(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, NextAWidgetProvider::class.java).apply {
+                action = ACTION_REFRESH
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                REFRESH_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE,
+            )
+
+            alarmManager.cancel(pendingIntent)
+            alarmManager.setRepeating(
+                AlarmManager.ELAPSED_REALTIME,
+                SystemClock.elapsedRealtime() + REFRESH_INTERVAL_MILLIS,
+                REFRESH_INTERVAL_MILLIS,
+                pendingIntent,
+            )
+        }
+
+        private fun cancelRefresh(context: Context) {
+            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            val intent = Intent(context, NextAWidgetProvider::class.java).apply {
+                action = ACTION_REFRESH
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                REFRESH_REQUEST_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or
+                    PendingIntent.FLAG_IMMUTABLE,
+            )
+            alarmManager.cancel(pendingIntent)
+        }
+
         private fun readEvents(context: Context): List<WidgetEvent> {
             val json = context
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -233,11 +278,26 @@ class NextAWidgetProvider : AppWidgetProvider() {
         updateAll(context)
     }
 
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
+        super.onDeleted(context, appWidgetIds)
+        if (appWidgetManagerHasNoWidgets(context)) {
+            cancelRefresh(context)
+        }
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action == ACTION_SYNC) {
-            updateAll(context)
+        when (intent.action) {
+            ACTION_SYNC,
+            ACTION_REFRESH,
+            -> updateAll(context)
         }
+    }
+
+    private fun appWidgetManagerHasNoWidgets(context: Context): Boolean {
+        val manager = AppWidgetManager.getInstance(context)
+        val component = ComponentName(context, NextAWidgetProvider::class.java)
+        return manager.getAppWidgetIds(component).isEmpty()
     }
 }
 
