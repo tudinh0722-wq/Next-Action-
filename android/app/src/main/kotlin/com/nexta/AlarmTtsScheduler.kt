@@ -38,6 +38,7 @@ object AlarmTtsScheduler {
     fun cancel(context: Context, requestKey: String) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         alarmManager.cancel(pendingIntent(context, requestKey, ""))
+        AlarmTtsReceiver.cancelVibration(context)
     }
 
     private fun pendingIntent(context: Context, requestKey: String, text: String): PendingIntent {
