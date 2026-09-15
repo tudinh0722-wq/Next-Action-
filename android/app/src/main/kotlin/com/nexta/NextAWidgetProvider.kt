@@ -183,33 +183,14 @@ class NextAWidgetProvider : AppWidgetProvider() {
             ).format(Date(timestamp))
         }
 
-        private fun calculateProgress(start: Long, end: Long): Int {
-            val now = System.currentTimeMillis()
-
-            if (end <= start) {
-                return if (now >= end) 100 else 0
-            }
-
-            if (now <= start) return 0
-            if (now >= end) return 100
-
-            val elapsed = now - start
-            val duration = end - start
-            return ((elapsed.toDouble() / duration) * 100).toInt()
-        }
-
         private fun formatCountdown(start: Long, end: Long): String {
             val now = System.currentTimeMillis()
 
-            if (now < start) {
-                return "Còn ${formatDuration(start - now)}"
+            return when {
+                now < start -> "CÒN ${formatDuration(start - now)}"
+                now < end -> "ĐANG DIỄN RA · ${formatDuration(end - now)}"
+                else -> "ĐÃ XONG"
             }
-
-            if (now < end) {
-                return "Đang diễn ra · còn ${formatDuration(end - now)}"
-            }
-
-            return "Đã kết thúc"
         }
 
         private fun formatDuration(millis: Long): String {
@@ -219,9 +200,23 @@ class NextAWidgetProvider : AppWidgetProvider() {
             val remainingMinutes = minutes % 60
 
             return when {
-                days > 0 -> "${days}ng ${hours}g"
-                hours > 0 -> "${hours}g ${remainingMinutes}p"
-                else -> "${remainingMinutes}p"
+                days > 0 -> "${days} NGÀY"
+                hours > 0 -> "${hours} GIỜ"
+                else -> "${remainingMinutes} PHÚT"
+            }
+        }
+
+        private fun calculateProgress(start: Long, end: Long): Int {
+            val duration = end - start
+            if (duration <= 0) return 100
+
+            val now = System.currentTimeMillis()
+            return when {
+                now <= start -> 0
+                now >= end -> 100
+                else -> (((now - start) * 100) / duration)
+                    .toInt()
+                    .coerceIn(0, 100)
             }
         }
     }
