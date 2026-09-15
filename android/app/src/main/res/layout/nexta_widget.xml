@@ -102,11 +102,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="#202124"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:maxLines="2"
+                android:ellipsize="none"
+                android:textColor="#555555"
+                android:textSize="14sp"
+                android:textStyle="normal" />
         </LinearLayout>
     </LinearLayout>
 
@@ -206,11 +206,11 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="3dp"
                 android:gravity="center"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:textColor="#202124"
-                android:textSize="18sp"
-                android:textStyle="bold" />
+                android:maxLines="2"
+                android:ellipsize="none"
+                android:textColor="#555555"
+                android:textSize="14sp"
+                android:textStyle="normal" />
         </LinearLayout>
     </LinearLayout>
 
