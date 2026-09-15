@@ -48,29 +48,35 @@ class NextAWidgetProvider : AppWidgetProvider() {
             views.setViewVisibility(R.id.widget_empty, View.GONE)
 
             bindEvent(
-                context,
-                views,
-                R.id.widget_event_1,
-                R.id.widget_event_1_title,
-                R.id.widget_event_1_time,
-                R.id.widget_event_1_countdown,
-                R.id.widget_event_1_meta,
-                events[0],
-                0,
+                context = context,
+                views = views,
+                rowId = R.id.widget_event_1,
+                titleId = R.id.widget_title_1,
+                locationId = R.id.widget_location_1,
+                noteId = R.id.widget_note_1,
+                startTimeId = R.id.widget_start_time_1,
+                endTimeId = R.id.widget_end_time_1,
+                progressId = R.id.widget_progress_1,
+                countdownId = R.id.widget_countdown_1,
+                event = events[0],
+                requestCode = 0,
             )
 
             if (events.size > 1) {
                 views.setViewVisibility(R.id.widget_event_2, View.VISIBLE)
                 bindEvent(
-                    context,
-                    views,
-                    R.id.widget_event_2,
-                    R.id.widget_event_2_title,
-                    R.id.widget_event_2_time,
-                    R.id.widget_event_2_countdown,
-                    R.id.widget_event_2_meta,
-                    events[1],
-                    1,
+                    context = context,
+                    views = views,
+                    rowId = R.id.widget_event_2,
+                    titleId = R.id.widget_title_2,
+                    locationId = R.id.widget_location_2,
+                    noteId = R.id.widget_note_2,
+                    startTimeId = R.id.widget_start_time_2,
+                    endTimeId = R.id.widget_end_time_2,
+                    progressId = R.id.widget_progress_2,
+                    countdownId = R.id.widget_countdown_2,
+                    event = events[1],
+                    requestCode = 1,
                 )
             } else {
                 views.setViewVisibility(R.id.widget_event_2, View.GONE)
@@ -84,22 +90,30 @@ class NextAWidgetProvider : AppWidgetProvider() {
             views: RemoteViews,
             rowId: Int,
             titleId: Int,
-            timeId: Int,
+            locationId: Int,
+            noteId: Int,
+            startTimeId: Int,
+            endTimeId: Int,
+            progressId: Int,
             countdownId: Int,
-            metaId: Int,
             event: WidgetEvent,
             requestCode: Int,
         ) {
             views.setTextViewText(titleId, event.title)
-            views.setTextViewText(
-                timeId,
-                formatTimeRange(event.start, event.end),
+            views.setTextViewText(locationId, event.location ?: "")
+            views.setTextViewText(noteId, event.note ?: "")
+            views.setTextViewText(startTimeId, formatTime(event.start))
+            views.setTextViewText(endTimeId, formatTime(event.end))
+            views.setProgressBar(
+                progressId,
+                100,
+                calculateProgress(event.start, event.end),
+                false,
             )
             views.setTextViewText(
                 countdownId,
                 formatCountdown(event.start, event.end),
             )
-            views.setTextViewText(metaId, event.location ?: "NextA")
 
             views.setOnClickPendingIntent(
                 rowId,
@@ -151,6 +165,8 @@ class NextAWidgetProvider : AppWidgetProvider() {
                                 ),
                                 location = item.optString("location")
                                     .takeIf { it.isNotBlank() },
+                                note = item.optString("note")
+                                    .takeIf { it.isNotBlank() },
                             ),
                         )
                     }
@@ -160,21 +176,26 @@ class NextAWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun formatTimeRange(start: Long, end: Long): String {
-            val day = SimpleDateFormat(
-                "EEE, dd/MM",
-                Locale("vi", "VN"),
-            ).format(Date(start))
-            val startTime = SimpleDateFormat(
+        private fun formatTime(timestamp: Long): String {
+            return SimpleDateFormat(
                 "HH:mm",
                 Locale("vi", "VN"),
-            ).format(Date(start))
-            val endTime = SimpleDateFormat(
-                "HH:mm",
-                Locale("vi", "VN"),
-            ).format(Date(end))
+            ).format(Date(timestamp))
+        }
 
-            return "$day · $startTime – $endTime"
+        private fun calculateProgress(start: Long, end: Long): Int {
+            val now = System.currentTimeMillis()
+
+            if (end <= start) {
+                return if (now >= end) 100 else 0
+            }
+
+            if (now <= start) return 0
+            if (now >= end) return 100
+
+            val elapsed = now - start
+            val duration = end - start
+            return ((elapsed.toDouble() / duration) * 100).toInt()
         }
 
         private fun formatCountdown(start: Long, end: Long): String {
@@ -227,4 +248,5 @@ data class WidgetEvent(
     val start: Long,
     val end: Long,
     val location: String?,
+    val note: String?,
 )
