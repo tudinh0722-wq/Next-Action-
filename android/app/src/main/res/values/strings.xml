@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">NextA</string>
-    <string name="widget_description">Hiển thị sự kiện sắp tới và đếm ngược thời gian</string>
+    <string name="nexta_widget_description">Hai sự kiện sắp tới trong NextA</string>
 </resources>
