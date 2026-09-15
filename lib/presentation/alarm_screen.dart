@@ -150,10 +150,15 @@ class _AlarmScreenState extends State<AlarmScreen> {
                           ),
                     ),
                   ],
-                  const Spacer(flex: 3),
-                  _SwipeToAcknowledge(
-                    progress: _dragProgress,
-                    enabled: !_closing,
+                  const Spacer(flex: 2),
+                  Center(
+                    child: SizedBox(
+                      width: 320,
+                      child: _SwipeToAcknowledge(
+                        progress: _dragProgress,
+                        enabled: !_closing,
+                      ),
+                    ),
                   ),
                 ],
               ),
