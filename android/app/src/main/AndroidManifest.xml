@@ -46,18 +46,17 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.nexta.action.SYNC_WIDGET" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/nexta_widget_info" />
         </receiver>
 
-        <!-- Required by flutter_local_notifications for scheduled alarms. -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false" />
 
-        <!-- Native receiver used to speak reminder text when Flutter is not running. -->
         <receiver
             android:name="com.nexta.AlarmTtsReceiver"
             android:exported="false" />
