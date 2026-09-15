@@ -29,8 +29,8 @@ Future<void> main() async {
     await database.replaceAll(events);
   }
 
-  // The database is the single source of truth. Both platform adapters are
-  // fed from this same snapshot at startup and after every database change.
+  // SQLite is the single source of truth. Platform adapters only receive
+  // snapshots derived from the same event list.
   unawaited(WidgetBridge.syncEvents(events));
   unawaited(scheduler.scheduleAll(events));
 
@@ -67,8 +67,10 @@ class NextAApp extends StatefulWidget {
 }
 
 class _NextAAppState extends State<NextAApp> {
+  static const _defaultSeedColor = Color(0xFF1A73E8);
+
   ThemeMode _themeMode = ThemeMode.system;
-  Color _seedColor = const Color(0xFF1A73E8);
+  Color _seedColor = _defaultSeedColor;
   AlarmAlert? _activeAlarm;
   String? _widgetEventId;
   StreamSubscription<AlarmAlert?>? _alarmSubscription;
@@ -76,26 +78,30 @@ class _NextAAppState extends State<NextAApp> {
   @override
   void initState() {
     super.initState();
+
     _activeAlarm = AlarmAlertController.pending;
+    _alarmSubscription = AlarmAlertController.stream.listen(_onAlarmChanged);
 
-    _alarmSubscription = AlarmAlertController.stream.listen((alert) {
-      if (!mounted) return;
-      setState(() => _activeAlarm = alert);
-    });
-
-    _initWidgetNavigation();
+    // Register the warm-start handler unconditionally. The handler must exist
+    // even when there is no initial widget event; otherwise a later widget tap
+    // can arrive after the app is already running and be lost.
+    WidgetBridge.setEventOpenHandler(_onWidgetEvent);
+    unawaited(_readInitialWidgetEvent());
   }
 
-  Future<void> _initWidgetNavigation() async {
-    final initialId = await WidgetBridge.getInitialEventId();
-    if (!mounted || initialId == null || initialId.isEmpty) return;
-    setState(() => _widgetEventId = initialId);
-
-    WidgetBridge.setEventOpenHandler(_handleWidgetEvent);
+  void _onAlarmChanged(AlarmAlert? alert) {
+    if (!mounted) return;
+    setState(() => _activeAlarm = alert);
   }
 
-  void _handleWidgetEvent(String eventId) {
+  void _onWidgetEvent(String eventId) {
     if (!mounted || eventId.isEmpty) return;
+    setState(() => _widgetEventId = eventId);
+  }
+
+  Future<void> _readInitialWidgetEvent() async {
+    final eventId = await WidgetBridge.getInitialEventId();
+    if (!mounted || eventId == null || eventId.isEmpty) return;
     setState(() => _widgetEventId = eventId);
   }
 
@@ -124,34 +130,36 @@ class _NextAAppState extends State<NextAApp> {
           brightness: Brightness.dark,
         );
 
+        final home = _activeAlarm == null
+            ? PlannerScreen(
+                events: widget.initialEvents,
+                database: widget.database,
+                scheduler: widget.scheduler,
+                tts: widget.tts,
+                widgetEventId: _widgetEventId,
+                onWidgetEventHandled: () {
+                  if (!mounted) return;
+                  setState(() => _widgetEventId = null);
+                },
+                themeMode: _themeMode,
+                seedColor: _seedColor,
+                onThemeChanged: (mode) =>
+                    setState(() => _themeMode = mode),
+                onSeedColorChanged: (color) =>
+                    setState(() => _seedColor = color),
+              )
+            : AlarmScreen(
+                alert: _activeAlarm!,
+                scheduler: widget.scheduler,
+              );
+
         return MaterialApp(
           title: 'NextA',
           debugShowCheckedModeBanner: false,
           theme: _theme(light),
           darkTheme: _theme(dark),
           themeMode: _themeMode,
-          home: _activeAlarm != null
-              ? AlarmScreen(
-                  alert: _activeAlarm!,
-                  scheduler: widget.scheduler,
-                )
-              : PlannerScreen(
-                  events: widget.initialEvents,
-                  database: widget.database,
-                  scheduler: widget.scheduler,
-                  tts: widget.tts,
-                  widgetEventId: _widgetEventId,
-                  onWidgetEventHandled: () {
-                    if (!mounted) return;
-                    setState(() => _widgetEventId = null);
-                  },
-                  themeMode: _themeMode,
-                  seedColor: _seedColor,
-                  onThemeChanged: (mode) =>
-                      setState(() => _themeMode = mode),
-                  onSeedColorChanged: (color) =>
-                      setState(() => _seedColor = color),
-                ),
+          home: home,
         );
       },
     );
