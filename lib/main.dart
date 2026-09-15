@@ -88,6 +88,14 @@ class _NextAAppState extends State<NextAApp> {
       if (!mounted) return;
       setState(() => _widgetEventId = eventId);
     });
+
+    // Covers the warm-start race where Android receives the widget intent
+    // before the Dart MethodChannel handler is registered.
+    Future<void>.delayed(const Duration(milliseconds: 100), () async {
+      final eventId = await WidgetBridge.getPendingEventId();
+      if (!mounted || eventId == null || eventId.isEmpty) return;
+      setState(() => _widgetEventId = eventId);
+    });
   }
 
   Future<void> _initWidgetEvent() async {
@@ -115,14 +123,9 @@ class _NextAAppState extends State<NextAApp> {
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
-        final light =
-            lightDynamic ?? ColorScheme.fromSeed(seedColor: _seedColor);
-        final dark =
-            darkDynamic ??
-                ColorScheme.fromSeed(
-                  seedColor: _seedColor,
-                  brightness: Brightness.dark,
-                );
+        final light = lightDynamic ?? ColorScheme.fromSeed(seedColor: _seedColor);
+        final dark = darkDynamic ??
+            ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.dark);
 
         return MaterialApp(
           title: 'NextA',
@@ -206,221 +209,26 @@ List<NextAEvent> _buildDemoEvents() {
       );
 
   return [
-    base(
-      id: 'math',
-      title: 'Giải tích',
-      type: EventType.classEvent,
-      start: DateTime(2026, 9, 10, 7, 30),
-      end: DateTime(2026, 9, 10, 9),
-      location: 'P. A204',
-      r: r10,
-    ),
-    base(
-      id: 'database',
-      title: 'Cơ sở dữ liệu',
-      type: EventType.classEvent,
-      start: DateTime(2026, 9, 10, 9, 15),
-      end: DateTime(2026, 9, 10, 11),
-      location: 'P. B302',
-      priority: 1,
-      r: r10,
-    ),
-    base(
-      id: 'assignment',
-      title: 'Nộp bài lập trình',
-      type: EventType.assignment,
-      start: DateTime(2026, 9, 10, 23),
-      end: DateTime(2026, 9, 10, 23, 30),
-      priority: 2,
-      r: r10,
-    ),
-    base(
-      id: 'english',
-      title: 'English presentation',
-      type: EventType.classEvent,
-      start: DateTime(2026, 9, 11, 8),
-      end: DateTime(2026, 9, 11, 9, 30),
-      r: r10,
-    ),
-    base(
-      id: 'exam',
-      title: 'Kiểm tra giữa kỳ',
-      type: EventType.exam,
-      start: DateTime(2026, 9, 14, 13, 30),
-      end: DateTime(2026, 9, 14, 15),
-      location: 'Hội trường A',
-      priority: 2,
-      r: r10,
-    ),
-    base(
-      id: 'meeting',
-      title: 'Họp nhóm NextA',
-      type: EventType.meeting,
-      start: DateTime(2026, 9, 16, 18, 30),
-      end: DateTime(2026, 9, 16, 19, 30),
-      r: r10,
-    ),
-    base(
-      id: 'personal',
-      title: 'Tập gym',
-      type: EventType.personal,
-      start: DateTime(2026, 9, 18, 17),
-      end: DateTime(2026, 9, 18, 18),
-      r: r10,
-    ),
-    base(
-      id: 'tmdt_20260917',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 9, 17, 9, 30),
-      end: DateTime(2026, 9, 17, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20260924',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 9, 24, 9, 30),
-      end: DateTime(2026, 9, 24, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261001',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 10, 1, 9, 30),
-      end: DateTime(2026, 10, 1, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261008',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 10, 8, 9, 30),
-      end: DateTime(2026, 10, 8, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261015',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 10, 15, 9, 30),
-      end: DateTime(2026, 10, 15, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261022',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 10, 22, 9, 30),
-      end: DateTime(2026, 10, 22, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261029',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 10, 29, 9, 30),
-      end: DateTime(2026, 10, 29, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261103',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 11, 3, 15, 10),
-      end: DateTime(2026, 11, 3, 17, 45),
-      location: 'P402-A9',
-      note: 'Lý thuyết',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261110',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 11, 10, 15, 10),
-      end: DateTime(2026, 11, 10, 17, 45),
-      location: 'P402-A9',
-      note: 'Lý thuyết',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261119',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 11, 19, 9, 30),
-      end: DateTime(2026, 11, 19, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261201',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 12, 1, 15, 10),
-      end: DateTime(2026, 12, 1, 17, 45),
-      location: 'P402-A9',
-      note: 'Lý thuyết',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261208',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 12, 8, 15, 10),
-      end: DateTime(2026, 12, 8, 17, 45),
-      location: 'P402-A9',
-      note: 'Lý thuyết',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20261231',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2026, 12, 31, 9, 30),
-      end: DateTime(2026, 12, 31, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
-    base(
-      id: 'tmdt_20270107',
-      title: 'Phát triển ứng dụng TMĐT',
-      type: EventType.classEvent,
-      start: DateTime(2027, 1, 7, 9, 30),
-      end: DateTime(2027, 1, 7, 12),
-      location: 'P1305-A1',
-      note: 'Thực hành',
-      priority: 1,
-      r: rTmdt,
-    ),
+    base(id: 'math', title: 'Giải tích', type: EventType.classEvent, start: DateTime(2026, 9, 10, 7, 30), end: DateTime(2026, 9, 10, 9), location: 'P. A204', r: r10),
+    base(id: 'database', title: 'Cơ sở dữ liệu', type: EventType.classEvent, start: DateTime(2026, 9, 10, 9, 15), end: DateTime(2026, 9, 10, 11), location: 'P. B302', priority: 1, r: r10),
+    base(id: 'assignment', title: 'Nộp bài lập trình', type: EventType.assignment, start: DateTime(2026, 9, 10, 23), end: DateTime(2026, 9, 10, 23, 30), priority: 2, r: r10),
+    base(id: 'english', title: 'English presentation', type: EventType.classEvent, start: DateTime(2026, 9, 11, 8), end: DateTime(2026, 9, 11, 9, 30), r: r10),
+    base(id: 'exam', title: 'Kiểm tra giữa kỳ', type: EventType.exam, start: DateTime(2026, 9, 14, 13, 30), end: DateTime(2026, 9, 14, 15), location: 'Hội trường A', priority: 2, r: r10),
+    base(id: 'meeting', title: 'Họp nhóm NextA', type: EventType.meeting, start: DateTime(2026, 9, 16, 18, 30), end: DateTime(2026, 9, 16, 19, 30), r: r10),
+    base(id: 'personal', title: 'Tập gym', type: EventType.personal, start: DateTime(2026, 9, 18, 17), end: DateTime(2026, 9, 18, 18), r: r10),
+    base(id: 'tmdt_20260917', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 9, 17, 9, 30), end: DateTime(2026, 9, 17, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20260924', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 9, 24, 9, 30), end: DateTime(2026, 9, 24, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261001', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 10, 1, 9, 30), end: DateTime(2026, 10, 1, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261008', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 10, 8, 9, 30), end: DateTime(2026, 10, 8, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261015', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 10, 15, 9, 30), end: DateTime(2026, 10, 15, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261022', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 10, 22, 9, 30), end: DateTime(2026, 10, 22, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261029', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 10, 29, 9, 30), end: DateTime(2026, 10, 29, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261103', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 11, 3, 15, 10), end: DateTime(2026, 11, 3, 17, 45), location: 'P402-A9', note: 'Lý thuyết', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261110', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 11, 10, 15, 10), end: DateTime(2026, 11, 10, 17, 45), location: 'P402-A9', note: 'Lý thuyết', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261119', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 11, 19, 9, 30), end: DateTime(2026, 11, 19, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261201', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 12, 1, 15, 10), end: DateTime(2026, 12, 1, 17, 45), location: 'P402-A9', note: 'Lý thuyết', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261208', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 12, 8, 15, 10), end: DateTime(2026, 12, 8, 17, 45), location: 'P402-A9', note: 'Lý thuyết', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20261231', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2026, 12, 31, 9, 30), end: DateTime(2026, 12, 31, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
+    base(id: 'tmdt_20270107', title: 'Phát triển ứng dụng TMĐT', type: EventType.classEvent, start: DateTime(2027, 1, 7, 9, 30), end: DateTime(2027, 1, 7, 12), location: 'P1305-A1', note: 'Thực hành', priority: 1, r: rTmdt),
   ];
 }
