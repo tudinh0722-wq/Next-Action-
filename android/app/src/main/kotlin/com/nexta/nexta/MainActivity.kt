@@ -2,8 +2,6 @@ package com.nexta
 
 import android.content.Intent
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -13,7 +11,6 @@ class MainActivity : FlutterActivity() {
         private const val ALARM_CHANNEL = "com.nexta/alarm_tts"
         private const val WIDGET_CHANNEL = "com.nexta/widget"
         private const val EVENT_ID_EXTRA = "nexta_event_id"
-        private const val WIDGET_EVENT_DELIVERY_DELAY_MS = 300L
     }
 
     private var widgetChannel: MethodChannel? = null
@@ -36,21 +33,12 @@ class MainActivity : FlutterActivity() {
                         val text = call.argument<String>("text")
 
                         if (requestKey.isNullOrBlank() || atMillis == null || text.isNullOrBlank()) {
-                            result.error(
-                                "INVALID_ARGUMENT",
-                                "Missing TTS alarm arguments",
-                                null,
-                            )
+                            result.error("INVALID_ARGUMENT", "Missing TTS alarm arguments", null)
                             return@setMethodCallHandler
                         }
 
                         try {
-                            AlarmTtsScheduler.schedule(
-                                this,
-                                requestKey,
-                                atMillis,
-                                text,
-                            )
+                            AlarmTtsScheduler.schedule(this, requestKey, atMillis, text)
                             result.success(null)
                         } catch (e: Exception) {
                             result.error("SCHEDULE_FAILED", e.message, null)
@@ -60,11 +48,7 @@ class MainActivity : FlutterActivity() {
                     "cancel" -> {
                         val requestKey = call.argument<String>("requestKey")
                         if (requestKey.isNullOrBlank()) {
-                            result.error(
-                                "INVALID_ARGUMENT",
-                                "Missing requestKey",
-                                null,
-                            )
+                            result.error("INVALID_ARGUMENT", "Missing requestKey", null)
                             return@setMethodCallHandler
                         }
 
@@ -105,7 +89,7 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
 
-                "getInitialEventId" -> {
+                "getInitialEventId", "getPendingEventId" -> {
                     result.success(pendingWidgetEventId)
                     pendingWidgetEventId = null
                 }
@@ -118,19 +102,7 @@ class MainActivity : FlutterActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-
-        val eventId = eventIdFromIntent(intent) ?: return
-        pendingWidgetEventId = eventId
-
-        // Android can deliver onNewIntent before Flutter's Dart-side
-        // MethodChannel handler has finished registering. Keep the ID in the
-        // Activity and deliver it shortly after the intent arrives so the
-        // planner reliably receives the widget tap.
-        Handler(Looper.getMainLooper()).postDelayed({
-            if (!isFinishing && !isDestroyed) {
-                widgetChannel?.invokeMethod("openEvent", eventId)
-            }
-        }, WIDGET_EVENT_DELIVERY_DELAY_MS)
+        eventIdFromIntent(intent)?.let { pendingWidgetEventId = it }
     }
 
     private fun eventIdFromIntent(intent: Intent?): String? {
