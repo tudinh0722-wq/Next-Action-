@@ -10,6 +10,7 @@ class WidgetBridge {
   WidgetBridge._();
 
   static const MethodChannel _channel = MethodChannel('com.nexta/widget');
+  static Timer? _pendingEventPoller;
 
   static void setEventOpenHandler(ValueChanged<String>? handler) {
     _channel.setMethodCallHandler((call) async {
@@ -21,6 +22,21 @@ class WidgetBridge {
       }
 
       return null;
+    });
+
+    // Keep a small pending-intent poller alive while the app is running.
+    // Android may deliver a widget tap through onNewIntent() while the Flutter
+    // activity is being resumed. In that case the native side stores the ID;
+    // polling makes the warm-start path reliable even if the MethodChannel
+    // message races with Flutter's lifecycle.
+    _pendingEventPoller?.cancel();
+    if (handler == null) return;
+
+    _pendingEventPoller = Timer.periodic(const Duration(milliseconds: 500), (_) async {
+      final eventId = await getPendingEventId();
+      if (eventId != null && eventId.isNotEmpty) {
+        handler(eventId);
+      }
     });
   }
 
