@@ -139,7 +139,6 @@ class _NextAAppState extends State<NextAApp> {
                   scheduler: widget.scheduler,
                 )
               : PlannerScreen(
-                  key: ValueKey(_widgetEventId),
                   events: widget.initialEvents,
                   database: widget.database,
                   scheduler: widget.scheduler,
@@ -147,6 +146,9 @@ class _NextAAppState extends State<NextAApp> {
                   widgetEventId: _widgetEventId,
                   onWidgetEventHandled: () {
                     if (!mounted) return;
+                    // Do not use a ValueKey based on widgetEventId here.
+                    // Clearing the ID after _selectDay() would otherwise
+                    // recreate PlannerScreen and reset it back to today.
                     setState(() => _widgetEventId = null);
                   },
                   themeMode: _themeMode,
