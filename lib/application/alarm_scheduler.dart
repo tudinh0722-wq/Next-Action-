@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -30,11 +31,16 @@ class AlarmScheduler {
 
   static const _defaultChannelId = 'nexta_reminder_v4_default';
   static const _highChannelId = 'nexta_reminder_v4_high';
-  static const _maxChannelId = 'nexta_reminder_v4_max';
+  // v5 is intentionally a new channel: Android notification-channel settings
+  // are immutable after creation, so changing the vibration pattern on the
+  // old v4 channel would not affect devices that already created it.
+  static const _maxChannelId = 'nexta_reminder_v5_max';
   static const _channelName = 'NextA - Nhắc sự kiện';
   static const _channelDescription = 'Nhắc trước khi sự kiện bắt đầu';
   static const AndroidNotificationSound _alarmSound =
       UriAndroidNotificationSound('content://settings/system/alarm_alert');
+  static final Int64List _alarmVibrationPattern =
+      Int64List.fromList(<int>[0, 1000, 500, 1000, 500, 1000]);
 
   static const MethodChannel _nativeTtsChannel =
       MethodChannel('com.nexta/alarm_tts');
@@ -116,7 +122,7 @@ class AlarmScheduler {
       ),
     );
     await android.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _maxChannelId,
         _channelName,
         description: _channelDescription,
@@ -124,6 +130,7 @@ class AlarmScheduler {
         playSound: true,
         sound: _alarmSound,
         enableVibration: true,
+        vibrationPattern: _alarmVibrationPattern,
         audioAttributesUsage: AudioAttributesUsage.alarm,
       ),
     );
@@ -152,10 +159,6 @@ class AlarmScheduler {
 
     await androidImpl.requestNotificationsPermission();
 
-    // Android 14+ can keep USE_FULL_SCREEN_INTENT disabled even when it is
-    // declared in AndroidManifest. Without this permission a full-screen
-    // alarm falls back to a heads-up notification, which is exactly the
-    // symptom where the user must tap the notification to reach AlarmScreen.
     try {
       final fullScreenGranted =
           await androidImpl.requestFullScreenIntentPermission() ?? false;
@@ -373,7 +376,7 @@ class AlarmScheduler {
     // All three product levels must enter the same full-screen alarm workflow.
     // Keep the Android channel at MAX because this is the configuration proven
     // to wake the locked screen on the target Samsung device.
-    return const NotificationDetails(
+    return NotificationDetails(
       android: AndroidNotificationDetails(
         _maxChannelId,
         _channelName,
@@ -383,13 +386,14 @@ class AlarmScheduler {
         playSound: true,
         sound: _alarmSound,
         enableVibration: true,
+        vibrationPattern: _alarmVibrationPattern,
         icon: '@mipmap/ic_launcher',
         category: AndroidNotificationCategory.alarm,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         fullScreenIntent: true,
         visibility: NotificationVisibility.public,
       ),
-      iOS: DarwinNotificationDetails(
+      iOS: const DarwinNotificationDetails(
         presentAlert: true,
         presentSound: true,
         presentBadge: false,
