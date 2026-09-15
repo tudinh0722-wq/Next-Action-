@@ -37,8 +37,11 @@ class NextAWidgetProvider : AppWidgetProvider() {
         private fun buildViews(context: Context): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.nexta_widget)
             val events = readEvents(context)
+            val upcomingEvents = events
+                .filter { it.end > System.currentTimeMillis() }
+                .sortedBy { it.start }
 
-            if (events.isEmpty()) {
+            if (upcomingEvents.isEmpty()) {
                 views.setViewVisibility(R.id.widget_empty, View.VISIBLE)
                 views.setViewVisibility(R.id.widget_event_1, View.GONE)
                 views.setViewVisibility(R.id.widget_event_2, View.GONE)
@@ -58,11 +61,11 @@ class NextAWidgetProvider : AppWidgetProvider() {
                 endTimeId = R.id.widget_end_time_1,
                 progressId = R.id.widget_progress_1,
                 countdownId = R.id.widget_countdown_1,
-                event = events[0],
+                event = upcomingEvents[0],
                 requestCode = 0,
             )
 
-            if (events.size > 1) {
+            if (upcomingEvents.size > 1) {
                 views.setViewVisibility(R.id.widget_event_2, View.VISIBLE)
                 bindEvent(
                     context = context,
@@ -75,7 +78,7 @@ class NextAWidgetProvider : AppWidgetProvider() {
                     endTimeId = R.id.widget_end_time_2,
                     progressId = R.id.widget_progress_2,
                     countdownId = R.id.widget_countdown_2,
-                    event = events[1],
+                    event = upcomingEvents[1],
                     requestCode = 1,
                 )
             } else {
@@ -186,24 +189,25 @@ class NextAWidgetProvider : AppWidgetProvider() {
         private fun formatCountdown(start: Long, end: Long): String {
             val now = System.currentTimeMillis()
 
-            return when {
-                now < start -> "CÒN ${formatDuration(start - now)}"
-                now < end -> "ĐANG DIỄN RA · ${formatDuration(end - now)}"
-                else -> "ĐÃ XONG"
+            return if (now < start) {
+                "BẮT ĐẦU SAU\n${formatDuration(start - now)}"
+            } else {
+                "KẾT THÚC SAU\n${formatDuration(end - now)}"
             }
         }
 
         private fun formatDuration(millis: Long): String {
-            val minutes = TimeUnit.MILLISECONDS.toMinutes(millis)
-            val days = minutes / (24 * 60)
-            val hours = (minutes % (24 * 60)) / 60
-            val remainingMinutes = minutes % 60
+            val totalMinutes = TimeUnit.MILLISECONDS
+                .toMinutes(millis.coerceAtLeast(0))
+            val days = totalMinutes / (24 * 60)
+            val hours = (totalMinutes % (24 * 60)) / 60
+            val minutes = totalMinutes % 60
 
-            return when {
-                days > 0 -> "${days} NGÀY"
-                hours > 0 -> "${hours} GIỜ"
-                else -> "${remainingMinutes} PHÚT"
-            }
+            return buildString {
+                if (days > 0) append("${days}d ")
+                if (hours > 0 || days > 0) append("${hours}h ")
+                append("${minutes}m")
+            }.trim()
         }
 
         private fun calculateProgress(start: Long, end: Long): Int {
