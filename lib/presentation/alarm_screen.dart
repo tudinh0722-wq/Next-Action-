@@ -53,9 +53,15 @@ class _AlarmScreenState extends State<AlarmScreen> {
     AlarmAlertController.consumePending();
   }
 
-  void _dismiss() {
+  Future<void> _dismiss() async {
     if (_closing) return;
     _closing = true;
+
+    // Auto-dismiss must also stop the native repeating vibration. It is the
+    // same acknowledgement of the active alarm from the scheduler's point of
+    // view, only without an explicit user swipe.
+    await widget.scheduler.cancelEvent(widget.alert.eventId);
+    if (!mounted) return;
     AlarmAlertController.consumePending();
   }
 
