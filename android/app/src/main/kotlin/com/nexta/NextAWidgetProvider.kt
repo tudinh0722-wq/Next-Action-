@@ -13,6 +13,7 @@ import org.json.JSONArray
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 class NextAWidgetProvider : AppWidgetProvider() {
     companion object {
@@ -52,6 +53,7 @@ class NextAWidgetProvider : AppWidgetProvider() {
                 R.id.widget_event_1,
                 R.id.widget_event_1_title,
                 R.id.widget_event_1_time,
+                R.id.widget_event_1_countdown,
                 R.id.widget_event_1_meta,
                 events[0],
                 0,
@@ -65,6 +67,7 @@ class NextAWidgetProvider : AppWidgetProvider() {
                     R.id.widget_event_2,
                     R.id.widget_event_2_title,
                     R.id.widget_event_2_time,
+                    R.id.widget_event_2_countdown,
                     R.id.widget_event_2_meta,
                     events[1],
                     1,
@@ -82,12 +85,20 @@ class NextAWidgetProvider : AppWidgetProvider() {
             rowId: Int,
             titleId: Int,
             timeId: Int,
+            countdownId: Int,
             metaId: Int,
             event: WidgetEvent,
             requestCode: Int,
         ) {
             views.setTextViewText(titleId, event.title)
-            views.setTextViewText(timeId, formatTime(event.start))
+            views.setTextViewText(
+                timeId,
+                formatTimeRange(event.start, event.end),
+            )
+            views.setTextViewText(
+                countdownId,
+                formatCountdown(event.start, event.end),
+            )
             views.setTextViewText(metaId, event.location ?: "NextA")
 
             views.setOnClickPendingIntent(
@@ -134,6 +145,10 @@ class NextAWidgetProvider : AppWidgetProvider() {
                                 id = item.getString("id"),
                                 title = item.getString("title"),
                                 start = item.getLong("start"),
+                                end = item.optLong(
+                                    "end",
+                                    item.getLong("start"),
+                                ),
                                 location = item.optString("location")
                                     .takeIf { it.isNotBlank() },
                             ),
@@ -145,11 +160,48 @@ class NextAWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun formatTime(millis: Long): String {
-            return SimpleDateFormat(
-                "EEE, dd/MM · HH:mm",
+        private fun formatTimeRange(start: Long, end: Long): String {
+            val day = SimpleDateFormat(
+                "EEE, dd/MM",
                 Locale("vi", "VN"),
-            ).format(Date(millis))
+            ).format(Date(start))
+            val startTime = SimpleDateFormat(
+                "HH:mm",
+                Locale("vi", "VN"),
+            ).format(Date(start))
+            val endTime = SimpleDateFormat(
+                "HH:mm",
+                Locale("vi", "VN"),
+            ).format(Date(end))
+
+            return "$day · $startTime – $endTime"
+        }
+
+        private fun formatCountdown(start: Long, end: Long): String {
+            val now = System.currentTimeMillis()
+
+            if (now < start) {
+                return "Còn ${formatDuration(start - now)}"
+            }
+
+            if (now < end) {
+                return "Đang diễn ra · còn ${formatDuration(end - now)}"
+            }
+
+            return "Đã kết thúc"
+        }
+
+        private fun formatDuration(millis: Long): String {
+            val minutes = TimeUnit.MILLISECONDS.toMinutes(millis)
+            val days = minutes / (24 * 60)
+            val hours = (minutes % (24 * 60)) / 60
+            val remainingMinutes = minutes % 60
+
+            return when {
+                days > 0 -> "${days}ng ${hours}g"
+                hours > 0 -> "${hours}g ${remainingMinutes}p"
+                else -> "${remainingMinutes}p"
+            }
         }
     }
 
@@ -173,5 +225,6 @@ data class WidgetEvent(
     val id: String,
     val title: String,
     val start: Long,
+    val end: Long,
     val location: String?,
 )
