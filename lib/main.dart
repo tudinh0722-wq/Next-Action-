@@ -19,9 +19,9 @@ Future<void> main() async {
   final scheduler = await AlarmScheduler.init(tts);
   final database = await EventDatabase.open();
 
-  const debugAlarmId = '__nexta_debug_alarm_test__';
-  await scheduler.cancelEvent(debugAlarmId);
-  await database.delete(debugAlarmId);
+  const legacyDebugAlarmId = '__nexta_debug_alarm_test__';
+  await scheduler.cancelEvent(legacyDebugAlarmId);
+  await database.delete(legacyDebugAlarmId);
 
   var events = await database.getAll();
   if (events.isEmpty) {
@@ -29,7 +29,10 @@ Future<void> main() async {
     await database.replaceAll(events);
   }
 
+  // The database is the single source of truth. Both platform adapters are
+  // fed from this same snapshot at startup and after every database change.
   unawaited(WidgetBridge.syncEvents(events));
+  unawaited(scheduler.scheduleAll(events));
 
   runApp(
     NextAApp(
@@ -43,8 +46,6 @@ Future<void> main() async {
   database.changes.listen((changedEvents) {
     unawaited(WidgetBridge.syncEvents(changedEvents));
   });
-
-  unawaited(scheduler.scheduleAll(events));
 }
 
 class NextAApp extends StatefulWidget {
@@ -69,8 +70,8 @@ class _NextAAppState extends State<NextAApp> {
   ThemeMode _themeMode = ThemeMode.system;
   Color _seedColor = const Color(0xFF1A73E8);
   AlarmAlert? _activeAlarm;
-  StreamSubscription<AlarmAlert>? _alarmSubscription;
   String? _widgetEventId;
+  StreamSubscription<AlarmAlert?>? _alarmSubscription;
 
   @override
   void initState() {
@@ -82,33 +83,26 @@ class _NextAAppState extends State<NextAApp> {
       setState(() => _activeAlarm = alert);
     });
 
-    _initWidgetEvent();
-
-    WidgetBridge.setEventOpenHandler((eventId) {
-      if (!mounted) return;
-      setState(() => _widgetEventId = eventId);
-    });
-
-    // Covers the warm-start race where Android receives the widget intent
-    // before the Dart MethodChannel handler is registered.
-    Future<void>.delayed(const Duration(milliseconds: 100), () async {
-      final eventId = await WidgetBridge.getPendingEventId();
-      if (!mounted || eventId == null || eventId.isEmpty) return;
-      setState(() => _widgetEventId = eventId);
-    });
+    _initWidgetNavigation();
   }
 
-  Future<void> _initWidgetEvent() async {
-    final eventId = await WidgetBridge.getInitialEventId();
+  Future<void> _initWidgetNavigation() async {
+    final initialId = await WidgetBridge.getInitialEventId();
+    if (!mounted || initialId == null || initialId.isEmpty) return;
+    setState(() => _widgetEventId = initialId);
 
-    if (!mounted || eventId == null || eventId.isEmpty) return;
+    WidgetBridge.setEventOpenHandler(_handleWidgetEvent);
+  }
 
+  void _handleWidgetEvent(String eventId) {
+    if (!mounted || eventId.isEmpty) return;
     setState(() => _widgetEventId = eventId);
   }
 
   @override
   void dispose() {
     _alarmSubscription?.cancel();
+    WidgetBridge.setEventOpenHandler(null);
     super.dispose();
   }
 
@@ -123,9 +117,12 @@ class _NextAAppState extends State<NextAApp> {
   Widget build(BuildContext context) {
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
-        final light = lightDynamic ?? ColorScheme.fromSeed(seedColor: _seedColor);
-        final dark = darkDynamic ??
-            ColorScheme.fromSeed(seedColor: _seedColor, brightness: Brightness.dark);
+        final light =
+            lightDynamic ?? ColorScheme.fromSeed(seedColor: _seedColor);
+        final dark = ColorScheme.fromSeed(
+          seedColor: _seedColor,
+          brightness: Brightness.dark,
+        );
 
         return MaterialApp(
           title: 'NextA',
@@ -146,28 +143,20 @@ class _NextAAppState extends State<NextAApp> {
                   widgetEventId: _widgetEventId,
                   onWidgetEventHandled: () {
                     if (!mounted) return;
-                    // Do not use a ValueKey based on widgetEventId here.
-                    // Clearing the ID after _selectDay() would otherwise
-                    // recreate PlannerScreen and reset it back to today.
                     setState(() => _widgetEventId = null);
                   },
                   themeMode: _themeMode,
                   seedColor: _seedColor,
-                  onThemeChanged: (mode) {
-                    setState(() => _themeMode = mode);
-                  },
-                  onSeedColorChanged: (color) {
-                    setState(() => _seedColor = color);
-                  },
+                  onThemeChanged: (mode) =>
+                      setState(() => _themeMode = mode),
+                  onSeedColorChanged: (color) =>
+                      setState(() => _seedColor = color),
                 ),
         );
       },
     );
   }
 }
-
-// ── Demo data factory ────────────────────────────────────────────────────────
-// DateTime is not const, so demo events must be created at runtime.
 
 List<NextAEvent> _buildDemoEvents() {
   const r10 = (
