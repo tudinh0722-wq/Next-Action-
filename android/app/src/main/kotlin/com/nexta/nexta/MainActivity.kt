@@ -2,6 +2,8 @@ package com.nexta
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -11,6 +13,7 @@ class MainActivity : FlutterActivity() {
         private const val ALARM_CHANNEL = "com.nexta/alarm_tts"
         private const val WIDGET_CHANNEL = "com.nexta/widget"
         private const val EVENT_ID_EXTRA = "nexta_event_id"
+        private const val WIDGET_EVENT_DELIVERY_DELAY_MS = 300L
     }
 
     private var widgetChannel: MethodChannel? = null
@@ -118,7 +121,16 @@ class MainActivity : FlutterActivity() {
 
         val eventId = eventIdFromIntent(intent) ?: return
         pendingWidgetEventId = eventId
-        widgetChannel?.invokeMethod("openEvent", eventId)
+
+        // Android can deliver onNewIntent before Flutter's Dart-side
+        // MethodChannel handler has finished registering. Keep the ID in the
+        // Activity and deliver it shortly after the intent arrives so the
+        // planner reliably receives the widget tap.
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!isFinishing && !isDestroyed) {
+                widgetChannel?.invokeMethod("openEvent", eventId)
+            }
+        }, WIDGET_EVENT_DELIVERY_DELAY_MS)
     }
 
     private fun eventIdFromIntent(intent: Intent?): String? {
