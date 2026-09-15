@@ -4,8 +4,8 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
-    android:alpha="0.4"
-    android:background="@drawable/nexta_widget_background">
+    android:background="@drawable/nexta_widget_background"
+    android:alpha="1.0">
 
     <TextView
         android:id="@+id/widget_header"
