@@ -6,6 +6,10 @@ import 'package:flutter/services.dart';
 
 import '../domain/event.dart';
 
+/// Android home-screen widget bridge.
+///
+/// Flutter remains the source of truth. The bridge only mirrors upcoming
+/// events to Android; the native provider decides which two events to render.
 class WidgetBridge {
   WidgetBridge._();
 
@@ -20,39 +24,40 @@ class WidgetBridge {
       if (eventId != null && eventId.isNotEmpty) {
         handler?.call(eventId);
       }
-
       return null;
     });
 
-    // Keep a small pending-intent poller alive while the app is running.
-    // Android may deliver a widget tap through onNewIntent() while the Flutter
-    // activity is being resumed. In that case the native side stores the ID;
-    // polling makes the warm-start path reliable even if the MethodChannel
-    // message races with Flutter's lifecycle.
     _pendingEventPoller?.cancel();
     if (handler == null) return;
 
-    _pendingEventPoller = Timer.periodic(const Duration(milliseconds: 500), (_) async {
-      final eventId = await getPendingEventId();
-      if (eventId != null && eventId.isNotEmpty) {
-        handler(eventId);
-      }
-    });
+    // Android can deliver a warm-start intent while Flutter is resuming.
+    // Native MainActivity holds the ID until Flutter consumes it.
+    _pendingEventPoller = Timer.periodic(
+      const Duration(milliseconds: 500),
+      (_) async {
+        final eventId = await getPendingEventId();
+        if (eventId != null && eventId.isNotEmpty) {
+          handler(eventId);
+        }
+      },
+    );
   }
 
+  /// Mirror all upcoming events, not only the two currently visible ones.
+  /// The native provider filters/sorts the cache and renders its top two.
   static Future<void> syncEvents(List<NextAEvent> events) async {
     final now = DateTime.now();
-    final payload = events.where((event) => event.end.isAfter(now)).toList()
+    final upcoming = events.where((event) => event.end.isAfter(now)).toList()
       ..sort((a, b) => a.start.compareTo(b.start));
 
-    final json = jsonEncode(payload.take(2).map(_toJson).toList());
-
     try {
-      await _channel.invokeMethod<void>('syncEvents', {'events': json});
+      await _channel.invokeMethod<void>('syncEvents', {
+        'events': jsonEncode(upcoming.map(_toJson).toList()),
+      });
     } on MissingPluginException {
-      // The bridge is Android-specific. Other platforms simply skip it.
-    } on PlatformException {
-      // Widget sync must never block normal planner operations.
+      // Android-only integration.
+    } on PlatformException catch (error) {
+      debugPrint('NextA widget sync failed: ${error.code}: ${error.message}');
     }
   }
 
@@ -83,5 +88,6 @@ class WidgetBridge {
         'end': event.end.millisecondsSinceEpoch,
         'location': event.location,
         'note': event.note,
+        'priority': event.priority,
       };
 }
