@@ -11,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="NEXTA"
-        android:textSize="13sp"
+        android:textSize="12sp"
         android:textStyle="bold"
         android:letterSpacing="0.08"
         android:textColor="#666666" />
@@ -23,7 +23,7 @@
         android:layout_weight="1"
         android:gravity="center"
         android:text="Không có sự kiện sắp tới"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:textColor="#666666" />
 
     <LinearLayout
@@ -32,190 +32,71 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingTop="10dp"
-        android:paddingBottom="10dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_event_1_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="#202124" />
-
-                <TextView
-                    android:id="@+id/widget_event_1_meta"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:textSize="13sp"
-                    android:textColor="#666666" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="end">
-
-                <TextView
-                    android:id="@+id/widget_event_1_start"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:textColor="#202124" />
-
-                <TextView
-                    android:id="@+id/widget_event_1_end"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:textSize="14sp"
-                    android:textColor="#666666" />
-            </LinearLayout>
-        </LinearLayout>
+        android:paddingBottom="8dp">
 
         <TextView
-            android:id="@+id/widget_event_1_countdown_label"
+            android:id="@+id/widget_event_1_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#777777" />
-
-        <TextView
-            android:id="@+id/widget_event_1_countdown"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:textSize="20sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#202124" />
 
-        <ProgressBar
-            android:id="@+id/widget_event_1_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <TextView
+            android:id="@+id/widget_event_1_time"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="7dp"
-            android:max="1000"
-            android:progress="0"
-            android:visibility="gone" />
-    </LinearLayout>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textSize="13sp"
+            android:textColor="#444444" />
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="#22000000" />
+        <TextView
+            android:id="@+id/widget_event_1_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textColor="#666666" />
+    </LinearLayout>
 
     <LinearLayout
         android:id="@+id/widget_event_2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingTop="10dp"
+        android:paddingTop="8dp"
         android:paddingBottom="4dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_event_2_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:textColor="#202124" />
-
-                <TextView
-                    android:id="@+id/widget_event_2_meta"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:maxLines="1"
-                    android:ellipsize="end"
-                    android:textSize="13sp"
-                    android:textColor="#666666" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:gravity="end">
-
-                <TextView
-                    android:id="@+id/widget_event_2_start"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textSize="17sp"
-                    android:textStyle="bold"
-                    android:textColor="#202124" />
-
-                <TextView
-                    android:id="@+id/widget_event_2_end"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:textSize="14sp"
-                    android:textColor="#666666" />
-            </LinearLayout>
-        </LinearLayout>
-
         <TextView
-            android:id="@+id/widget_event_2_countdown_label"
+            android:id="@+id/widget_event_2_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:textColor="#777777" />
-
-        <TextView
-            android:id="@+id/widget_event_2_countdown"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="1dp"
-            android:textSize="20sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:textColor="#202124" />
 
-        <ProgressBar
-            android:id="@+id/widget_event_2_progress"
-            style="?android:attr/progressBarStyleHorizontal"
+        <TextView
+            android:id="@+id/widget_event_2_time"
             android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:layout_marginTop="7dp"
-            android:max="1000"
-            android:progress="0"
-            android:visibility="gone" />
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:textSize="13sp"
+            android:textColor="#444444" />
+
+        <TextView
+            android:id="@+id/widget_event_2_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textColor="#666666" />
     </LinearLayout>
 </LinearLayout>
