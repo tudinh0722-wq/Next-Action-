@@ -49,7 +49,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
   late List<NextAEvent> _events;
 
   bool _expanded = true;
-
   final _countdownPolicy = const CountdownPolicy();
   Timer? _countdownTimer;
   late final RecurrenceService _recurrenceService;
@@ -58,18 +57,15 @@ class _PlannerScreenState extends State<PlannerScreen> {
   @override
   void initState() {
     super.initState();
-
     final now = DateTime.now();
     _selected = DateTime(now.year, now.month, now.day);
     _month = DateTime(now.year, now.month);
-    _events = List.of(widget.events)
-      ..sort((a, b) => a.start.compareTo(b.start));
+    _events = List.of(widget.events)..sort((a, b) => a.start.compareTo(b.start));
 
     _recurrenceService = RecurrenceService(
       database: widget.database,
       scheduler: widget.scheduler,
     );
-
     _bulkImportService = BulkImportService(
       database: widget.database,
       scheduler: widget.scheduler,
@@ -82,7 +78,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
   @override
   void didUpdateWidget(covariant PlannerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-
     if (widget.widgetEventId != oldWidget.widgetEventId &&
         widget.widgetEventId != null) {
       _handleWidgetEvent(widget.widgetEventId);
@@ -94,15 +89,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
     var event = _events.where((item) => item.id == eventId).firstOrNull;
 
-    // The widget can be tapped while its cached event list is newer than the
-    // list passed to PlannerScreen. Fall back to the database so the target
-    // event is still resolved instead of silently leaving the calendar on today.
+    // Resolve against the database as a fallback. This handles a widget tap
+    // when the widget's cached event list is newer than PlannerScreen's list.
     if (event == null) {
       final latestEvents = await widget.database.getAll();
       if (!mounted) return;
-
       latestEvents.sort((a, b) => a.start.compareTo(b.start));
-      _events = latestEvents;
+      setState(() => _events = latestEvents);
       event = latestEvents.where((item) => item.id == eventId).firstOrNull;
     }
 
@@ -127,38 +120,21 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   void _startTicker() {
     _countdownTimer?.cancel();
-
     final secondsUntilNextMinute = 60 - DateTime.now().second;
-
-    _countdownTimer = Timer(
-      Duration(seconds: secondsUntilNextMinute),
-      () {
-        if (!mounted) return;
-
-        setState(() {});
-
-        _countdownTimer = Timer.periodic(
-          const Duration(minutes: 1),
-          (_) {
-            if (mounted) {
-              setState(() {});
-            }
-          },
-        );
-      },
-    );
+    _countdownTimer = Timer(Duration(seconds: secondsUntilNextMinute), () {
+      if (!mounted) return;
+      setState(() {});
+      _countdownTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+        if (mounted) setState(() {});
+      });
+    });
   }
 
   List<NextAEvent> _eventsFor(DateTime day) {
-    final result = _events
-        .where(
-          (event) =>
-              event.start.year == day.year &&
-              event.start.month == day.month &&
-              event.start.day == day.day,
-        )
-        .toList();
-
+    final result = _events.where((event) =>
+        event.start.year == day.year &&
+        event.start.month == day.month &&
+        event.start.day == day.day).toList();
     result.sort((a, b) => a.start.compareTo(b.start));
     return result;
   }
@@ -170,19 +146,13 @@ class _PlannerScreenState extends State<PlannerScreen> {
     });
   }
 
-  void _shiftDay(int days) {
-    _selectDay(_selected.add(Duration(days: days)));
-  }
-
-  void _shiftWeek(int weeks) {
-    _shiftDay(weeks * 7);
-  }
+  void _shiftDay(int days) => _selectDay(_selected.add(Duration(days: days)));
+  void _shiftWeek(int weeks) => _shiftDay(weeks * 7);
 
   void _shiftMonth(int months) {
     final target = DateTime(_month.year, _month.month + months);
     final lastDay = DateTime(target.year, target.month + 1, 0).day;
     final day = _selected.day > lastDay ? lastDay : _selected.day;
-
     setState(() {
       _month = target;
       _selected = DateTime(target.year, target.month, day);
@@ -191,15 +161,9 @@ class _PlannerScreenState extends State<PlannerScreen> {
 
   void _handleVerticalSwipe(DragEndDetails details) {
     final velocity = details.primaryVelocity ?? 0;
-
     if (velocity.abs() < 220) return;
-
-    if (velocity < 0 && _expanded) {
-      setState(() => _expanded = false);
-    }
-    if (velocity > 0 && !_expanded) {
-      setState(() => _expanded = true);
-    }
+    if (velocity < 0 && _expanded) setState(() => _expanded = false);
+    if (velocity > 0 && !_expanded) setState(() => _expanded = true);
   }
 
   Future<void> _reloadEvents() async {
@@ -209,10 +173,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
     setState(() => _events = events);
   }
 
-  void _applyAndPush(void Function() mutate) {
-    setState(mutate);
-  }
-
   Future<void> _editEvent(NextAEvent? event) async {
     final result = await showEventEditor(
       context,
@@ -220,7 +180,6 @@ class _PlannerScreenState extends State<PlannerScreen> {
       selectedDay: _selected,
       importService: event == null ? _bulkImportService : null,
     );
-
     if (!mounted) return;
 
     if (result == null) {
@@ -232,7 +191,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
       final scope = result.scope ?? RecurrenceScope.single;
       final removed = await _recurrenceService.delete(event, scope, _events);
       if (!mounted) return;
-      _applyAndPush(() => _events.removeWhere((e) => removed.contains(e.id)));
+      setState(() => _events.removeWhere((item) => removed.contains(item.id)));
       return;
     }
 
@@ -247,8 +206,8 @@ class _PlannerScreenState extends State<PlannerScreen> {
         _events,
       );
       if (!mounted) return;
-      _applyAndPush(() {
-        _events.removeWhere((e) => editResult.toRemove.contains(e.id));
+      setState(() {
+        _events.removeWhere((item) => editResult.toRemove.contains(item.id));
         _events.addAll(editResult.toAdd);
         _events.sort((a, b) => a.start.compareTo(b.start));
       });
@@ -256,11 +215,11 @@ class _PlannerScreenState extends State<PlannerScreen> {
     }
 
     await widget.database.upsertAll(result.events);
-    for (final e in result.events) {
-      await widget.scheduler.scheduleEvent(e);
+    for (final newEvent in result.events) {
+      await widget.scheduler.scheduleEvent(newEvent);
     }
     if (!mounted) return;
-    _applyAndPush(() {
+    setState(() {
       _events.addAll(result.events);
       _events.sort((a, b) => a.start.compareTo(b.start));
     });
@@ -272,22 +231,19 @@ class _PlannerScreenState extends State<PlannerScreen> {
       selectedDay: DateTime(day.year, day.month, day.day),
       importService: _bulkImportService,
     );
-
     if (!mounted) return;
-
     if (result == null) {
       await _reloadEvents();
       return;
     }
-
     if (result.events.isEmpty) return;
 
     await widget.database.upsertAll(result.events);
-    for (final e in result.events) {
-      await widget.scheduler.scheduleEvent(e);
+    for (final newEvent in result.events) {
+      await widget.scheduler.scheduleEvent(newEvent);
     }
     if (!mounted) return;
-    _applyAndPush(() {
+    setState(() {
       _events.addAll(result.events);
       _events.sort((a, b) => a.start.compareTo(b.start));
     });
@@ -392,17 +348,14 @@ class _PlannerScreenState extends State<PlannerScreen> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
+      builder: (_) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Giao diện',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-              ),
+              const Text('Giao diện', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               SegmentedButton<ThemeMode>(
                 segments: const [
@@ -414,10 +367,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                 onSelectionChanged: (s) => widget.onThemeChanged?.call(s.first),
               ),
               const SizedBox(height: 18),
-              const Text(
-                'Màu chủ đề',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
+              const Text('Màu chủ đề', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 10,
@@ -429,10 +379,7 @@ class _PlannerScreenState extends State<PlannerScreen> {
                     Color(0xFF8E4A2F),
                     Color(0xFF7A4E00),
                   ])
-                    _SeedColorButton(
-                      color: color,
-                      onSelected: widget.onSeedColorChanged,
-                    ),
+                    _SeedColorButton(color: color, onSelected: widget.onSeedColorChanged),
                 ],
               ),
             ],
@@ -491,16 +438,8 @@ class _SearchDialogState extends State<_SearchDialog> {
               children: [
                 Row(
                   children: [
-                    const Expanded(
-                      child: Text(
-                        'Tìm kiếm',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
+                    const Expanded(child: Text('Tìm kiếm', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700))),
+                    IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close_rounded)),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -516,29 +455,17 @@ class _SearchDialogState extends State<_SearchDialog> {
                 const SizedBox(height: 12),
                 Expanded(
                   child: _results.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Không tìm thấy sự kiện',
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          ),
-                        )
+                      ? Center(child: Text('Không tìm thấy sự kiện', style: TextStyle(color: scheme.onSurfaceVariant)))
                       : ListView.separated(
                           padding: EdgeInsets.zero,
                           itemCount: _results.length,
                           separatorBuilder: (_, __) => const Divider(height: 1),
                           itemBuilder: (_, i) {
-                            final e = _results[i];
+                            final event = _results[i];
                             return ListTile(
-                              title: Text(
-                                e.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                '${e.start.day}/${e.start.month}/${e.start.year} · '
-                                '${e.location ?? 'Không có địa điểm'}',
-                              ),
-                              onTap: () => Navigator.pop(context, e),
+                              title: Text(event.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text('${event.start.day}/${event.start.month}/${event.start.year} · ${event.location ?? 'Không có địa điểm'}'),
+                              onTap: () => Navigator.pop(context, event),
                             );
                           },
                         ),
@@ -565,4 +492,95 @@ class _SeedColorButton extends StatelessWidget {
         },
         child: CircleAvatar(radius: 17, backgroundColor: color),
       );
+}
+
+class PlannerTopBar extends StatelessWidget {
+  const PlannerTopBar({
+    super.key,
+    required this.monthLabel,
+    required this.today,
+    required this.onMenu,
+    required this.onSearch,
+    required this.onToday,
+  });
+
+  final String monthLabel;
+  final int today;
+  final VoidCallback onMenu;
+  final VoidCallback onSearch;
+  final VoidCallback onToday;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 64,
+      child: Row(
+        children: [
+          IconButton(onPressed: onMenu, icon: const Icon(Icons.menu_rounded)),
+          const Spacer(),
+          Text(monthLabel, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700)),
+          const Spacer(),
+          IconButton(onPressed: onSearch, icon: const Icon(Icons.search_rounded)),
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: Colors.transparent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              child: InkWell(
+                onTap: onToday,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: scheme.outline, width: 1.5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text('$today', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class PlannerFab extends StatelessWidget {
+  const PlannerFab({super.key, required this.label, required this.onTap});
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 3,
+      shadowColor: scheme.shadow.withValues(alpha: .18),
+      color: scheme.surfaceContainerHighest,
+      shape: const StadiumBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: SizedBox(
+          height: 60,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.add_rounded, size: 18),
+                const SizedBox(width: 6),
+                Flexible(child: Text(label, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
