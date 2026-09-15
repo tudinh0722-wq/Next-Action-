@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -25,14 +26,10 @@ class WidgetBridge {
 
   static Future<void> syncEvents(List<NextAEvent> events) async {
     final now = DateTime.now();
-    final payload = events
-        .where((event) => event.end.isAfter(now))
-        .toList()
+    final payload = events.where((event) => event.end.isAfter(now)).toList()
       ..sort((a, b) => a.start.compareTo(b.start));
 
-    final json = jsonEncode(
-      payload.take(2).map(_toJson).toList(),
-    );
+    final json = jsonEncode(payload.take(2).map(_toJson).toList());
 
     try {
       await _channel.invokeMethod<void>('syncEvents', {'events': json});
@@ -46,6 +43,16 @@ class WidgetBridge {
   static Future<String?> getInitialEventId() async {
     try {
       return await _channel.invokeMethod<String>('getInitialEventId');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  static Future<String?> getPendingEventId() async {
+    try {
+      return await _channel.invokeMethod<String>('getPendingEventId');
     } on MissingPluginException {
       return null;
     } on PlatformException {
