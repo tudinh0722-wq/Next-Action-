@@ -21,6 +21,7 @@ class NextAWidgetProvider : AppWidgetProvider() {
     companion object {
         const val ACTION_SYNC = "com.nexta.action.SYNC_WIDGET"
         private const val ACTION_REFRESH = "com.nexta.action.REFRESH_WIDGET"
+        private const val ACTION_BOOT_COMPLETED = "android.intent.action.BOOT_COMPLETED"
         const val PREFS_NAME = "nexta_widget"
         const val EVENTS_KEY = "events_json"
         const val EVENT_ID_EXTRA = "nexta_event_id"
@@ -38,7 +39,11 @@ class NextAWidgetProvider : AppWidgetProvider() {
                 }
             }
 
-            scheduleRefresh(context)
+            if (ids.isNotEmpty()) {
+                scheduleRefresh(context)
+            } else {
+                cancelRefresh(context)
+            }
         }
 
         private fun buildViews(context: Context): RemoteViews {
@@ -233,7 +238,6 @@ class NextAWidgetProvider : AppWidgetProvider() {
 
         private fun formatCountdown(start: Long, end: Long): String {
             val now = System.currentTimeMillis()
-
             return if (now < start) {
                 "BẮT ĐẦU SAU\n${formatDuration(start - now)}"
             } else {
@@ -290,6 +294,7 @@ class NextAWidgetProvider : AppWidgetProvider() {
         when (intent.action) {
             ACTION_SYNC,
             ACTION_REFRESH,
+            ACTION_BOOT_COMPLETED,
             -> updateAll(context)
         }
     }
