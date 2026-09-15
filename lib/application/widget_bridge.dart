@@ -59,5 +59,6 @@ class WidgetBridge {
         'start': event.start.millisecondsSinceEpoch,
         'end': event.end.millisecondsSinceEpoch,
         'location': event.location,
+        'note': event.note,
       };
 }
